@@ -11,13 +11,16 @@ from dotenv import load_dotenv
 # 載入環境變數
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
+from fastapi import Query
 from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper
 from scheduler import start_scheduler, stop_scheduler
+import database
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """啟動/關閉排程器"""
+    await database.init_db()
     start_scheduler()
     yield
     stop_scheduler()
@@ -108,6 +111,19 @@ async def get_mobile_all():
     """iOS + Android 全部手遊排行"""
     data = await mobile_scraper.fetch_all_mobile()
     return {"data": data, "source": "App Store + Google Play"}
+
+
+# ============================================================
+# Phase 3 端點：歷史趨勢
+# ============================================================
+
+@app.get("/api/history/{source}/{game_id}", tags=["歷史趨勢"])
+async def get_history(source: str, game_id: str, days: int = Query(default=7, ge=1, le=30)):
+    """取得遊戲歷史數據（source: steam | twitch，days: 1-30）"""
+    if source not in ("steam", "twitch"):
+        return {"data": [], "game_id": game_id, "source": source}
+    data = await database.get_history(source, game_id, days)
+    return {"data": data, "game_id": game_id, "source": source}
 
 
 # ============================================================

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import { useWatchlist } from '../hooks/useWatchlist'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 
-export default function SteamPanel() {
+export default function SteamPanel({ onTrendClick }) {
     const [games, setGames] = useState([])
     const [loading, setLoading] = useState(true)
+    const { isWatched, addToWatchlist, removeFromWatchlist } = useWatchlist()
 
     const fetchData = async () => {
         try {
@@ -55,20 +57,43 @@ export default function SteamPanel() {
                         <span>暫無資料</span>
                     </div>
                 ) : (
-                    games.map((game, i) => (
-                        <div key={game.appid || i} className="list-item">
-                            <span className={`list-item__rank ${i < 3 ? 'list-item__rank--top3' : ''}`}>
-                                {i + 1}
-                            </span>
-                            <div className="list-item__info">
-                                <div className="list-item__name">{game.name}</div>
-                                <div className="list-item__meta">AppID: {game.appid}</div>
+                    games.map((game, i) => {
+                        const watched = isWatched(String(game.appid), 'steam')
+                        return (
+                            <div key={game.appid || i} className="list-item">
+                                <span className={`list-item__rank ${i < 3 ? 'list-item__rank--top3' : ''}`}>
+                                    {i + 1}
+                                </span>
+                                <div className="list-item__info">
+                                    <div className="list-item__name">{game.name}</div>
+                                    <div className="list-item__meta">AppID: {game.appid}</div>
+                                </div>
+                                <div className="list-item__value">
+                                    {game.current_players?.toLocaleString() || '—'}
+                                </div>
+                                <div className="list-item__actions">
+                                    <button
+                                        className="trend-btn"
+                                        title="查看趨勢"
+                                        onClick={() => onTrendClick?.(String(game.appid), game.name, 'steam')}
+                                    >
+                                        📈
+                                    </button>
+                                    <button
+                                        className={`star-btn ${watched ? 'star-btn--active' : ''}`}
+                                        title={watched ? '取消收藏' : '加入追蹤'}
+                                        onClick={() =>
+                                            watched
+                                                ? removeFromWatchlist(String(game.appid), 'steam')
+                                                : addToWatchlist({ id: String(game.appid), name: game.name, source: 'steam' })
+                                        }
+                                    >
+                                        {watched ? '★' : '☆'}
+                                    </button>
+                                </div>
                             </div>
-                            <div className="list-item__value">
-                                {game.current_players?.toLocaleString() || '—'}
-                            </div>
-                        </div>
-                    ))
+                        )
+                    })
                 )}
             </div>
         </div>

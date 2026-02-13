@@ -8,6 +8,7 @@ APScheduler 定時排程
 import asyncio
 from apscheduler.schedulers.background import BackgroundScheduler
 from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper
+import database
 
 scheduler = BackgroundScheduler()
 
@@ -17,20 +18,43 @@ def _run_async(coro):
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(coro)
+        result = loop.run_until_complete(coro)
         loop.close()
+        return result
     except Exception as e:
         print(f"[Scheduler] Error: {e}")
+        return None
+
+
+async def _update_steam_async():
+    games = await steam_scraper.fetch_top_games()
+    if games:
+        for game in games[:10]:
+            await database.save_snapshot(
+                "steam", str(game["appid"]), game["name"], game["current_players"]
+            )
+    return games
+
+
+async def _update_twitch_async():
+    games = await twitch_scraper.fetch_top_games()
+    if games:
+        for game in games[:10]:
+            if game.get("viewer_count", 0) > 0:
+                await database.save_snapshot(
+                    "twitch", str(game["id"]), game["name"], game["viewer_count"]
+                )
+    return games
 
 
 def update_steam():
     print("[Scheduler] Updating Steam data...")
-    _run_async(steam_scraper.fetch_top_games())
+    _run_async(_update_steam_async())
 
 
 def update_twitch():
     print("[Scheduler] Updating Twitch data...")
-    _run_async(twitch_scraper.fetch_top_games())
+    _run_async(_update_twitch_async())
 
 
 def update_discussions():

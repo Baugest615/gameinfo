@@ -6,11 +6,20 @@ import TwitchPanel from './components/TwitchPanel'
 import DiscussionPanel from './components/DiscussionPanel'
 import NewsPanel from './components/NewsPanel'
 import MobilePanel from './components/MobilePanel'
+import WatchlistPanel from './components/WatchlistPanel'
+import TrendModal from './components/TrendModal'
+import { useWatchlist } from './hooks/useWatchlist'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 
 export default function App() {
     const [steamData, setSteamData] = useState([])
+    const [trendTarget, setTrendTarget] = useState(null)
+    const { watchlist, removeFromWatchlist } = useWatchlist()
+
+    const handleTrendClick = (id, name, source) => {
+        setTrendTarget({ id, name, source })
+    }
 
     // 取得 Steam 資料供 Header ticker 使用
     useEffect(() => {
@@ -32,24 +41,18 @@ export default function App() {
         <div className="app">
             <Header steamData={steamData} />
             <div className="main-grid">
-                <SteamPanel />
-                <TwitchPanel />
+                <SteamPanel onTrendClick={handleTrendClick} />
+                <TwitchPanel onTrendClick={handleTrendClick} />
                 <DiscussionPanel />
                 <NewsPanel />
                 <MobilePanel />
-                {/* Phase 3 預留位置 */}
-                <div className="panel">
-                    <div className="panel__header">
-                        <div className="panel__title">
-                            <span className="panel__title-icon">📊</span> 搜尋趨勢 (Coming Soon)
-                        </div>
-                    </div>
-                    <div className="empty-state">
-                        <span className="empty-state__icon">🔮</span>
-                        <span>Phase 3 — Google Trends 整合</span>
-                    </div>
-                </div>
+                <WatchlistPanel
+                    watchlist={watchlist}
+                    removeFromWatchlist={removeFromWatchlist}
+                    onTrendClick={handleTrendClick}
+                />
             </div>
+            <TrendModal target={trendTarget} onClose={() => setTrendTarget(null)} />
         </div>
     )
 }
