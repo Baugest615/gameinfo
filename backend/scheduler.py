@@ -1,6 +1,9 @@
 """
 APScheduler 定時排程
-每 10 分鐘更新所有資料來源
+- Steam / 新聞：每 30 分鐘
+- Twitch：每 15 分鐘
+- 巴哈/PTT 討論：每 60 分鐘
+- 手遊排行：每 180 分鐘
 """
 import asyncio
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -46,18 +49,15 @@ def update_mobile():
 
 
 def start_scheduler():
-    """啟動定時排程（每 10 分鐘更新）"""
-    # Phase 1: 核心數據
-    scheduler.add_job(update_steam, "interval", minutes=10, id="steam", replace_existing=True)
-    scheduler.add_job(update_twitch, "interval", minutes=10, id="twitch", replace_existing=True)
-    scheduler.add_job(update_discussions, "interval", minutes=10, id="discussions", replace_existing=True)
-
-    # Phase 2: 新聞 + 手遊
-    scheduler.add_job(update_news, "interval", minutes=10, id="news", replace_existing=True)
-    scheduler.add_job(update_mobile, "interval", minutes=30, id="mobile", replace_existing=True)  # 手遊排行更新慢，30分鐘
+    """啟動定時排程"""
+    scheduler.add_job(update_steam, "interval", minutes=30, id="steam", replace_existing=True)
+    scheduler.add_job(update_twitch, "interval", minutes=15, id="twitch", replace_existing=True)
+    scheduler.add_job(update_discussions, "interval", minutes=60, id="discussions", replace_existing=True)
+    scheduler.add_job(update_news, "interval", minutes=30, id="news", replace_existing=True)
+    scheduler.add_job(update_mobile, "interval", minutes=180, id="mobile", replace_existing=True)
 
     scheduler.start()
-    print("[Scheduler] Started - updating every 10 minutes")
+    print("[Scheduler] Started - Steam/News: 30min, Twitch: 15min, Discussions: 60min, Mobile: 180min")
 
 
 def stop_scheduler():
