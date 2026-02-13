@@ -31,7 +31,7 @@ export default function TwitchPanel({ onTrendClick }) {
             <div className="panel">
                 <div className="panel__header">
                     <div className="panel__title">
-                        <span className="panel__title-icon">📺</span> TWITCH 直播熱度
+                        <span className="panel__title-icon">📺</span> TWITCH 中文直播熱度
                     </div>
                 </div>
                 <div className="loading-state">
@@ -46,7 +46,7 @@ export default function TwitchPanel({ onTrendClick }) {
         <div className="panel">
             <div className="panel__header">
                 <div className="panel__title">
-                    <span className="panel__title-icon">📺</span> TWITCH 直播熱度
+                    <span className="panel__title-icon">📺</span> TWITCH 中文直播熱度
                 </div>
                 <span className="panel__badge panel__badge--live">● LIVE</span>
             </div>
