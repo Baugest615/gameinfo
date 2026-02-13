@@ -14,8 +14,8 @@ export default function MobilePanel() {
 
     useEffect(() => {
         Promise.all([
-            fetch('http://localhost:8000/api/mobile/ios').then(r => r.json()),
-            fetch('http://localhost:8000/api/mobile/android').then(r => r.json()),
+            fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api/mobile/ios`).then(r => r.json()),
+            fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api/mobile/android`).then(r => r.json()),
         ])
             .then(([ios, android]) => {
                 setIosData(ios.data);

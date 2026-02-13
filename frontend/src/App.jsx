@@ -7,7 +7,7 @@ import DiscussionPanel from './components/DiscussionPanel'
 import NewsPanel from './components/NewsPanel'
 import MobilePanel from './components/MobilePanel'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 
 export default function App() {
     const [steamData, setSteamData] = useState([])

@@ -13,7 +13,7 @@ export default function DiscussionPanel() {
     const [activeTab, setActiveTab] = useState('bahamut_boards');
 
     useEffect(() => {
-        fetch('http://localhost:8000/api/discussions')
+        fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api/discussions`)
             .then(r => r.json())
             .then(d => { setData(d.data); setLoading(false); })
             .catch(() => setLoading(false));
