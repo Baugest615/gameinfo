@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.venv/
+venv/
+
+# Backend cache
+backend/cache/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Claude Code local settings
+.claude/
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
+nul
