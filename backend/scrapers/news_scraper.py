@@ -1,8 +1,9 @@
 """
-即時新聞爬取模組 (Phase 2)
+即時新聞爬取模組
 - 巴哈姆特 GNN RSS
-- 4Gamer RSS
+- 4Gamers TW 網頁爬蟲
 - UDN 遊戲角落 網頁爬蟲
+- Yahoo 遊戲新聞 RSS
 """
 import feedparser
 import httpx
@@ -14,15 +15,15 @@ import hashlib
 
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cache")
 CACHE_FILE = os.path.join(CACHE_DIR, "news_data.json")
-MAX_NEWS = 50  # 總保留上限
+MAX_NEWS = 50
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8",
 }
 
 
 def _news_hash(title, source):
-    """產生新聞去重 hash"""
     return hashlib.md5(f"{title}:{source}".encode()).hexdigest()
 
 
@@ -33,7 +34,6 @@ async def fetch_gnn_rss():
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get(url, headers=HEADERS)
             resp.raise_for_status()
-
         feed = feedparser.parse(resp.text)
         news = []
         for entry in feed.entries[:20]:
@@ -53,67 +53,64 @@ async def fetch_gnn_rss():
         return []
 
 
-async def fetch_4gamer_rss():
-    """4Gamer 遊戲新聞 RSS"""
-    url = "https://www.4gamer.net/rss/index.xml"
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(url, headers=HEADERS)
-            resp.raise_for_status()
-
-        feed = feedparser.parse(resp.text)
-        news = []
-        for entry in feed.entries[:20]:
-            news.append({
-                "id": _news_hash(entry.get("title", ""), "4Gamer"),
-                "title": entry.get("title", ""),
-                "url": entry.get("link", ""),
-                "summary": entry.get("summary", "")[:100],
-                "source": "4Gamer",
-                "source_icon": "🕹️",
-                "published_at": entry.get("published", ""),
-                "fetched_at": int(time.time()),
-            })
-        return news
-    except Exception as e:
-        print(f"[News] 4Gamer RSS error: {e}")
-        return []
-
-
-async def fetch_udn_game():
-    """UDN 遊戲角落 網頁爬蟲"""
-    url = "https://game.udn.com/game/cate/122080"
+async def fetch_4gamers_tw():
+    """4Gamers TW 台灣遊戲新聞"""
+    url = "https://www.4gamers.com.tw/site/column/latest-news"
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             resp = await client.get(url, headers=HEADERS)
             resp.raise_for_status()
-
         soup = BeautifulSoup(resp.text, "html.parser")
         news = []
-
-        articles = soup.select("div.story-list__text, div.story-list__holder a")
-        if not articles:
-            articles = soup.select("a[href*='game.udn.com']")
-
         seen = set()
-        for el in articles[:20]:
-            if el.name == "a":
-                title = el.get_text(strip=True)
-                href = el.get("href", "")
-            else:
-                a_tag = el.select_one("a")
-                if not a_tag:
-                    continue
-                title = a_tag.get_text(strip=True)
-                href = a_tag.get("href", "")
 
-            if not title or not href or title in seen:
+        for a in soup.select("a[href]"):
+            href = a.get("href", "")
+            if "/site/column/" not in href and "/site/news/" not in href:
+                continue
+            title = a.get_text(strip=True)
+            if not title or len(title) < 5 or title in seen:
                 continue
             seen.add(title)
-
             if not href.startswith("http"):
-                href = f"https://game.udn.com{href}"
+                href = f"https://www.4gamers.com.tw{href}"
+            news.append({
+                "id": _news_hash(title, "4Gamers TW"),
+                "title": title,
+                "url": href,
+                "summary": "",
+                "source": "4Gamers TW",
+                "source_icon": "🕹️",
+                "published_at": "",
+                "fetched_at": int(time.time()),
+            })
+            if len(news) >= 20:
+                break
+        return news
+    except Exception as e:
+        print(f"[News] 4Gamers TW error: {e}")
+        return []
 
+
+async def fetch_udn_game():
+    """UDN 遊戲角落"""
+    url = "https://game.udn.com/game/index"
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            resp = await client.get(url, headers=HEADERS)
+            resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        news = []
+        seen = set()
+
+        for a in soup.select("a[href]"):
+            href = a.get("href", "")
+            if "game.udn.com/game/story" not in href:
+                continue
+            title = a.get_text(strip=True)
+            if not title or len(title) < 5 or title in seen:
+                continue
+            seen.add(title)
             news.append({
                 "id": _news_hash(title, "UDN"),
                 "title": title,
@@ -124,22 +121,52 @@ async def fetch_udn_game():
                 "published_at": "",
                 "fetched_at": int(time.time()),
             })
-
+            if len(news) >= 20:
+                break
         return news
     except Exception as e:
         print(f"[News] UDN error: {e}")
         return []
 
 
+async def fetch_yahoo_game():
+    """Yahoo 遊戲新聞"""
+    url = "https://tw.news.yahoo.com/rss/game-3c"
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            resp = await client.get(url, headers=HEADERS)
+            resp.raise_for_status()
+        feed = feedparser.parse(resp.text)
+        news = []
+        for entry in feed.entries[:20]:
+            title = entry.get("title", "")
+            if not title:
+                continue
+            news.append({
+                "id": _news_hash(title, "Yahoo"),
+                "title": title,
+                "url": entry.get("link", ""),
+                "summary": entry.get("summary", "")[:100],
+                "source": "Yahoo 遊戲",
+                "source_icon": "📱",
+                "published_at": entry.get("published", ""),
+                "fetched_at": int(time.time()),
+            })
+        return news
+    except Exception as e:
+        print(f"[News] Yahoo game error: {e}")
+        return []
+
+
 async def aggregate_news():
-    """聚合所有新聞來源，去重並截斷至 MAX_NEWS"""
+    """聚合所有新聞來源"""
     gnn = await fetch_gnn_rss()
-    four_gamer = await fetch_4gamer_rss()
+    four_gamers = await fetch_4gamers_tw()
     udn = await fetch_udn_game()
+    yahoo = await fetch_yahoo_game()
 
-    all_news = gnn + four_gamer + udn
+    all_news = gnn + four_gamers + udn + yahoo
 
-    # 去重
     seen_ids = set()
     unique_news = []
     for item in all_news:
@@ -147,7 +174,6 @@ async def aggregate_news():
             seen_ids.add(item["id"])
             unique_news.append(item)
 
-    # 按時間排序（最新的在前），截斷
     unique_news.sort(key=lambda x: x.get("fetched_at", 0), reverse=True)
     unique_news = unique_news[:MAX_NEWS]
 
