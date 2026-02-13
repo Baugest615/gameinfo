@@ -3,7 +3,6 @@
 - 巴哈姆特 GNN RSS
 - 4Gamers TW 網頁爬蟲
 - UDN 遊戲角落 網頁爬蟲
-- Yahoo 遊戲新聞 RSS
 """
 import feedparser
 import httpx
@@ -16,6 +15,7 @@ import hashlib
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cache")
 CACHE_FILE = os.path.join(CACHE_DIR, "news_data.json")
 MAX_NEWS = 50
+PER_SOURCE = 25  # 每來源最多抓取數量，3 來源 × 25 = 75，去重後可達 50
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -36,7 +36,7 @@ async def fetch_gnn_rss():
             resp.raise_for_status()
         feed = feedparser.parse(resp.text)
         news = []
-        for entry in feed.entries[:20]:
+        for entry in feed.entries[:PER_SOURCE]:
             news.append({
                 "id": _news_hash(entry.get("title", ""), "GNN"),
                 "title": entry.get("title", ""),
@@ -84,7 +84,7 @@ async def fetch_4gamers_tw():
                 "published_at": "",
                 "fetched_at": int(time.time()),
             })
-            if len(news) >= 20:
+            if len(news) >= PER_SOURCE:
                 break
         return news
     except Exception as e:
@@ -121,40 +121,11 @@ async def fetch_udn_game():
                 "published_at": "",
                 "fetched_at": int(time.time()),
             })
-            if len(news) >= 20:
+            if len(news) >= PER_SOURCE:
                 break
         return news
     except Exception as e:
         print(f"[News] UDN error: {e}")
-        return []
-
-
-async def fetch_yahoo_game():
-    """Yahoo 遊戲新聞"""
-    url = "https://tw.news.yahoo.com/rss/game-3c"
-    try:
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-            resp = await client.get(url, headers=HEADERS)
-            resp.raise_for_status()
-        feed = feedparser.parse(resp.text)
-        news = []
-        for entry in feed.entries[:20]:
-            title = entry.get("title", "")
-            if not title:
-                continue
-            news.append({
-                "id": _news_hash(title, "Yahoo"),
-                "title": title,
-                "url": entry.get("link", ""),
-                "summary": entry.get("summary", "")[:100],
-                "source": "Yahoo 遊戲",
-                "source_icon": "📱",
-                "published_at": entry.get("published", ""),
-                "fetched_at": int(time.time()),
-            })
-        return news
-    except Exception as e:
-        print(f"[News] Yahoo game error: {e}")
         return []
 
 
@@ -163,9 +134,8 @@ async def aggregate_news():
     gnn = await fetch_gnn_rss()
     four_gamers = await fetch_4gamers_tw()
     udn = await fetch_udn_game()
-    yahoo = await fetch_yahoo_game()
 
-    all_news = gnn + four_gamers + udn + yahoo
+    all_news = gnn + four_gamers + udn
 
     seen_ids = set()
     unique_news = []
