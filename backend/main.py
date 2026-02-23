@@ -35,8 +35,12 @@ app = FastAPI(
 
 # CORS 設定
 _frontend_url = os.getenv("FRONTEND_URL", "")
-_origins = ["http://localhost:5173", "http://localhost:3000"]
-if _frontend_url:
+_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://gameinfo-drab.vercel.app",
+]
+if _frontend_url and _frontend_url not in _origins:
     _origins.append(_frontend_url)
 
 app.add_middleware(
