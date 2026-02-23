@@ -657,10 +657,10 @@ body {
 
 
 /* ═══════════════════════════════════════════════
-   Phase 5 — NLP 情緒分析 badge + 預測按鈕
+   Phase 5 — 討論情緒 + AI 預測
    ═══════════════════════════════════════════════ */
 
-/* 情緒 badge（新聞/討論列表用） */
+/* 情緒 badge（討論文章列表用，僅顯示正面/負面） */
 .sentiment-badge {
   font-size: 10px;
   font-weight: 600;
@@ -678,16 +678,9 @@ body {
   color: #ef4444;
   background: rgba(239, 68, 68, 0.12);
 }
-.sentiment-badge--neutral {
-  color: #64748b;
-  background: rgba(100, 116, 139, 0.1);
-}
 
 /* header 輿情指標 */
 .panel__sentiment {
-  display: flex;
-  align-items: center;
-  gap: 4px;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;

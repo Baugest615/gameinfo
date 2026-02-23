@@ -11,7 +11,7 @@ import json
 import os
 import time
 import re
-from scrapers.sentiment import analyze as analyze_sentiment, aggregate_sentiment
+from scrapers.sentiment import analyze_title, analyze_ptt_article, aggregate_sentiment
 
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cache")
 CACHE_FILE = os.path.join(CACHE_DIR, "discussion_data.json")
@@ -289,11 +289,13 @@ async def fetch_all_discussions():
         bahamut_articles = await fetch_bahamut_hot_articles()
         ptt_articles = await fetch_ptt_hot_articles()
 
-        # NLP 情緒分析（僅文章 tab，版面名稱無分析意義）
+        # 情緒分析：巴哈用關鍵字，PTT 用推噓比 + 關鍵字
         for item in bahamut_articles:
-            item["sentiment"] = analyze_sentiment(item.get("title", ""))
+            item["sentiment"] = analyze_title(item.get("title", ""))
         for item in ptt_articles:
-            item["sentiment"] = analyze_sentiment(item.get("title", ""))
+            item["sentiment"] = analyze_ptt_article(
+                item.get("title", ""), item.get("popularity_value", 0)
+            )
 
         all_articles = bahamut_articles + ptt_articles
 

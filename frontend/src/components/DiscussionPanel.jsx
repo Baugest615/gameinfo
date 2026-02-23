@@ -13,13 +13,13 @@ export default function DiscussionPanel() {
     const [activeTab, setActiveTab] = useState('bahamut_boards');
     const [sentimentSummary, setSentimentSummary] = useState(null);
 
+    const isArticleTab = (tab) => tab === 'bahamut_articles' || tab === 'ptt_articles';
+
     const sentimentIcon = (label) => {
         if (label === 'positive') return '↑ 正面';
         if (label === 'negative') return '↓ 負面';
         return '→ 中性';
     };
-
-    const isArticleTab = (tab) => tab === 'bahamut_articles' || tab === 'ptt_articles';
 
     useEffect(() => {
         fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api/discussions`)
@@ -101,9 +101,9 @@ export default function DiscussionPanel() {
                                 </div>
                             </div>
                             {/* Sentiment badge (article tabs only) */}
-                            {isArticleTab(activeTab) && item.sentiment && (
+                            {isArticleTab(activeTab) && item.sentiment && item.sentiment.label !== 'neutral' && (
                                 <span className={`sentiment-badge sentiment-badge--${item.sentiment.label}`}>
-                                    {item.sentiment.label === 'positive' ? '正面' : item.sentiment.label === 'negative' ? '負面' : '中性'}
+                                    {item.sentiment.label === 'positive' ? '正面' : '負面'}
                                 </span>
                             )}
                             {/* Popularity / badge */}

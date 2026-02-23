@@ -15,11 +15,10 @@ gameinfo-system/
 │   ├── scrapers/
 │   │   ├── steam_scraper.py      # Steam Web API（全球排行）
 │   │   ├── twitch_scraper.py     # Twitch Helix API（language=zh 中文直播）
-│   │   ├── news_scraper.py       # 台灣遊戲新聞（GNN RSS / 4Gamers TW / UDN）+ NLP 情緒
-│   │   ├── discussion_scraper.py # 巴哈姆特 / PTT / 遊戲大亂鬥 + NLP 情緒
+│   │   ├── news_scraper.py       # 台灣遊戲新聞（GNN RSS / 4Gamers TW / UDN）
+│   │   ├── discussion_scraper.py # 巴哈姆特 / PTT / 遊戲大亂鬥
 │   │   ├── mobile_scraper.py     # App Store / Google Play 手遊排行
-│   │   ├── gtrends_scraper.py    # Google Trends 台灣遊戲/二次元熱搜
-│   │   └── sentiment.py          # SnowNLP 中文情緒分析模組
+│   │   └── gtrends_scraper.py    # Google Trends 台灣遊戲/二次元熱搜
 │   ├── cache/        # JSON 快取（+ history.db SQLite）
 │   ├── requirements.txt
 │   └── .env          # 本地環境變數（不進 git）
@@ -89,7 +88,7 @@ Twitch：15 分鐘
 - **Phase 2** ✅ 台灣即時新聞 / 手遊排行（iOS + Android）
 - **Phase 3** ✅ 歷史趨勢圖（Recharts LineChart）
 - **Phase 4** ✅ Google Trends 台灣遊戲/二次元熱搜（取代追蹤清單）
-- **Phase 5** ✅ NLP 情緒分析（SnowNLP）+ AI 熱度預測（加權線性回歸 + 日週期調整）
+- **Phase 5** ✅ AI 熱度預測（加權線性回歸 + 日週期調整）
 
 ## 已知限制
 
@@ -108,6 +107,6 @@ Twitch：15 分鐘
 
 ## 技術棧
 
-- Backend: Python 3.13, FastAPI, APScheduler, httpx, BeautifulSoup4, feedparser, aiosqlite, snownlp
+- Backend: Python 3.13, FastAPI, APScheduler, httpx, BeautifulSoup4, feedparser, aiosqlite
 - Frontend: React 18, Vite, Recharts
 - 儲存：JSON 快取（即時資料）+ SQLite `history.db`（歷史趨勢）
