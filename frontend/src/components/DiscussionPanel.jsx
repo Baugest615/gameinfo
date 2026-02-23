@@ -11,11 +11,24 @@ export default function DiscussionPanel() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('bahamut_boards');
+    const [sentimentSummary, setSentimentSummary] = useState(null);
+
+    const sentimentIcon = (label) => {
+        if (label === 'positive') return '↑ 正面';
+        if (label === 'negative') return '↓ 負面';
+        return '→ 中性';
+    };
+
+    const isArticleTab = (tab) => tab === 'bahamut_articles' || tab === 'ptt_articles';
 
     useEffect(() => {
         fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api/discussions`)
             .then(r => r.json())
-            .then(d => { setData(d.data); setLoading(false); })
+            .then(d => {
+                setData(d.data);
+                setSentimentSummary(d.data?.sentiment_summary || null);
+                setLoading(false);
+            })
             .catch(() => setLoading(false));
     }, []);
 
@@ -28,9 +41,16 @@ export default function DiscussionPanel() {
                     <span className="panel__title-icon">💬</span>
                     討論聲量
                 </div>
-                <span className="panel__badge panel__badge--count">
-                    {data?.total_count || 0}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {sentimentSummary && (
+                        <span className={`panel__sentiment panel__sentiment--${sentimentSummary.label}`}>
+                            {sentimentIcon(sentimentSummary.label)}
+                        </span>
+                    )}
+                    <span className="panel__badge panel__badge--count">
+                        {data?.total_count || 0}
+                    </span>
+                </div>
             </div>
             <div className="tab-switcher">
                 {TABS.map(tab => (
@@ -80,6 +100,12 @@ export default function DiscussionPanel() {
                                     {activeTab === 'ptt_articles' && item.source}
                                 </div>
                             </div>
+                            {/* Sentiment badge (article tabs only) */}
+                            {isArticleTab(activeTab) && item.sentiment && (
+                                <span className={`sentiment-badge sentiment-badge--${item.sentiment.label}`}>
+                                    {item.sentiment.label === 'positive' ? '正面' : item.sentiment.label === 'negative' ? '負面' : '中性'}
+                                </span>
+                            )}
                             {/* Popularity / badge */}
                             {activeTab === 'ptt_boards' && item.popularity > 0 && (
                                 <span className="list-item__value list-item__value--hot">

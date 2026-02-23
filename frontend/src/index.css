@@ -654,3 +654,66 @@ body {
   padding: 16px;
   flex: 1;
 }
+
+
+/* ═══════════════════════════════════════════════
+   Phase 5 — NLP 情緒分析 badge + 預測按鈕
+   ═══════════════════════════════════════════════ */
+
+/* 情緒 badge（新聞/討論列表用） */
+.sentiment-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+.sentiment-badge--positive {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+}
+.sentiment-badge--negative {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+.sentiment-badge--neutral {
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.1);
+}
+
+/* header 輿情指標 */
+.panel__sentiment {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.panel__sentiment--positive { color: #22c55e; }
+.panel__sentiment--negative { color: #ef4444; }
+.panel__sentiment--neutral  { color: #64748b; }
+
+/* 趨勢 Modal 預測 toggle */
+.forecast-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.forecast-btn:hover {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+.forecast-btn--active {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: #f59e0b;
+  color: #f59e0b;
+}

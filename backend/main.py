@@ -15,6 +15,7 @@ from fastapi import Query
 from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper, gtrends_scraper
 from scheduler import start_scheduler, stop_scheduler
 import database
+import predictor
 
 
 @asynccontextmanager
@@ -122,12 +123,20 @@ async def get_mobile_all():
 # ============================================================
 
 @app.get("/api/history/{source}/{game_id}", tags=["歷史趨勢"])
-async def get_history(source: str, game_id: str, days: int = Query(default=7, ge=1, le=30)):
-    """取得遊戲歷史數據（source: steam | twitch，days: 1-30）"""
+async def get_history(
+    source: str,
+    game_id: str,
+    days: int = Query(default=7, ge=1, le=30),
+    forecast: bool = Query(default=False),
+):
+    """取得遊戲歷史數據（source: steam | twitch，days: 1-30，forecast: 是否包含預測）"""
     if source not in ("steam", "twitch"):
-        return {"data": [], "game_id": game_id, "source": source}
+        return {"data": [], "forecast": [], "game_id": game_id, "source": source}
     data = await database.get_history(source, game_id, days)
-    return {"data": data, "game_id": game_id, "source": source}
+    forecast_data = []
+    if forecast and len(data) >= 6:
+        forecast_data = predictor.predict(data)
+    return {"data": data, "forecast": forecast_data, "game_id": game_id, "source": source}
 
 
 # ============================================================

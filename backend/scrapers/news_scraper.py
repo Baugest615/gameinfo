@@ -11,6 +11,7 @@ import json
 import os
 import time
 import hashlib
+from scrapers.sentiment import analyze as analyze_sentiment, aggregate_sentiment
 
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cache")
 CACHE_FILE = os.path.join(CACHE_DIR, "news_data.json")
@@ -147,10 +148,16 @@ async def aggregate_news():
     unique_news.sort(key=lambda x: x.get("fetched_at", 0), reverse=True)
     unique_news = unique_news[:MAX_NEWS]
 
+    # NLP 情緒分析
+    for item in unique_news:
+        text = item["title"] + " " + item.get("summary", "")
+        item["sentiment"] = analyze_sentiment(text)
+
     result = {
         "news": unique_news,
         "total_count": len(unique_news),
         "max_count": MAX_NEWS,
+        "sentiment_summary": aggregate_sentiment(unique_news),
         "updated_at": int(time.time()),
     }
 

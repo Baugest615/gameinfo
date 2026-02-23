@@ -6,6 +6,7 @@ export default function NewsPanel() {
     const [news, setNews] = useState([])
     const [loading, setLoading] = useState(true)
     const [totalCount, setTotalCount] = useState(0)
+    const [sentimentSummary, setSentimentSummary] = useState(null)
 
     const fetchData = async () => {
         try {
@@ -13,11 +14,18 @@ export default function NewsPanel() {
             const json = await resp.json()
             setNews(json.data?.news || [])
             setTotalCount(json.data?.total_count || 0)
+            setSentimentSummary(json.data?.sentiment_summary || null)
         } catch (err) {
             console.error('[News] Fetch error:', err)
         } finally {
             setLoading(false)
         }
+    }
+
+    const sentimentIcon = (label) => {
+        if (label === 'positive') return '↑ 正面'
+        if (label === 'negative') return '↓ 負面'
+        return '→ 中性'
     }
 
     useEffect(() => {
@@ -68,9 +76,16 @@ export default function NewsPanel() {
                 <div className="panel__title">
                     <span className="panel__title-icon">📰</span> 即時新聞
                 </div>
-                <span className="panel__badge panel__badge--count">
-                    {totalCount}/50
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {sentimentSummary && (
+                        <span className={`panel__sentiment panel__sentiment--${sentimentSummary.label}`}>
+                            {sentimentIcon(sentimentSummary.label)}
+                        </span>
+                    )}
+                    <span className="panel__badge panel__badge--count">
+                        {totalCount}/50
+                    </span>
+                </div>
             </div>
             <div className="panel__body">
                 {news.length === 0 ? (
@@ -92,6 +107,11 @@ export default function NewsPanel() {
                                 <span className={`news-item__source ${getSourceClass(item.source)}`}>
                                     {item.source_icon} {item.source}
                                 </span>
+                                {item.sentiment && (
+                                    <span className={`sentiment-badge sentiment-badge--${item.sentiment.label}`}>
+                                        {item.sentiment.label === 'positive' ? '正面' : item.sentiment.label === 'negative' ? '負面' : '中性'}
+                                    </span>
+                                )}
                                 <span className="news-item__time">
                                     {formatTime(item.published_at || item.fetched_at)}
                                 </span>
