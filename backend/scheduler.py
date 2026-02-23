@@ -2,12 +2,12 @@
 APScheduler 定時排程
 - Steam / 新聞：每 30 分鐘
 - Twitch：每 15 分鐘
-- 巴哈/PTT 討論：每 60 分鐘
+- 巴哈/PTT 討論 / Google Trends：每 60 分鐘
 - 手遊排行：每 180 分鐘
 """
 import asyncio
 from apscheduler.schedulers.background import BackgroundScheduler
-from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper
+from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper, gtrends_scraper
 import database
 
 scheduler = BackgroundScheduler()
@@ -72,6 +72,11 @@ def update_mobile():
     _run_async(mobile_scraper.fetch_all_mobile())
 
 
+def update_gtrends():
+    print("[Scheduler] Updating Google Trends...")
+    _run_async(gtrends_scraper.fetch_google_trends())
+
+
 def start_scheduler():
     """啟動定時排程"""
     scheduler.add_job(update_steam, "interval", minutes=30, id="steam", replace_existing=True)
@@ -79,9 +84,10 @@ def start_scheduler():
     scheduler.add_job(update_discussions, "interval", minutes=60, id="discussions", replace_existing=True)
     scheduler.add_job(update_news, "interval", minutes=30, id="news", replace_existing=True)
     scheduler.add_job(update_mobile, "interval", minutes=180, id="mobile", replace_existing=True)
+    scheduler.add_job(update_gtrends, "interval", minutes=60, id="gtrends", replace_existing=True)
 
     scheduler.start()
-    print("[Scheduler] Started - Steam/News: 30min, Twitch: 15min, Discussions: 60min, Mobile: 180min")
+    print("[Scheduler] Started - Steam/News: 30min, Twitch: 15min, Discussions/GTrends: 60min, Mobile: 180min")
 
 
 def stop_scheduler():

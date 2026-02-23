@@ -6,17 +6,14 @@ import TwitchPanel from './components/TwitchPanel'
 import DiscussionPanel from './components/DiscussionPanel'
 import NewsPanel from './components/NewsPanel'
 import MobilePanel from './components/MobilePanel'
-import WatchlistPanel from './components/WatchlistPanel'
+import GoogleTrendsPanel from './components/GoogleTrendsPanel'
 import TrendModal from './components/TrendModal'
-import { useWatchlist } from './hooks/useWatchlist'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 
 export default function App() {
     const [steamData, setSteamData] = useState([])
     const [trendTarget, setTrendTarget] = useState(null)
-    const { watchlist, removeFromWatchlist } = useWatchlist()
-
     const handleTrendClick = (id, name, source) => {
         setTrendTarget({ id, name, source })
     }
@@ -46,11 +43,7 @@ export default function App() {
                 <DiscussionPanel />
                 <NewsPanel />
                 <MobilePanel />
-                <WatchlistPanel
-                    watchlist={watchlist}
-                    removeFromWatchlist={removeFromWatchlist}
-                    onTrendClick={handleTrendClick}
-                />
+                <GoogleTrendsPanel />
             </div>
             <TrendModal target={trendTarget} onClose={() => setTrendTarget(null)} />
         </div>

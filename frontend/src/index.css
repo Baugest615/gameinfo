@@ -549,37 +549,6 @@ body {
   background: rgba(59, 130, 246, 0.15);
 }
 
-/* ⭐ 收藏按鈕 */
-.star-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 13px;
-  padding: 2px 4px;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  opacity: 0.5;
-  transition: opacity 0.15s, color 0.15s, background 0.15s;
-  line-height: 1;
-}
-.star-btn:hover {
-  opacity: 1;
-  background: rgba(234, 179, 8, 0.12);
-  color: var(--accent-yellow);
-}
-.star-btn--active {
-  color: var(--accent-yellow);
-  opacity: 1;
-}
-
-/* 追蹤清單操作按鈕群組 */
-.watchlist-item__actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
 /* 趨勢 Modal overlay */
 .trend-modal-overlay {
   position: fixed;

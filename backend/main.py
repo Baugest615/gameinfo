@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 from fastapi import Query
-from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper
+from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper, gtrends_scraper
 from scheduler import start_scheduler, stop_scheduler
 import database
 
@@ -127,6 +127,17 @@ async def get_history(source: str, game_id: str, days: int = Query(default=7, ge
 
 
 # ============================================================
+# Phase 4 端點：Google Trends 熱搜
+# ============================================================
+
+@app.get("/api/google-trends", tags=["Google Trends"])
+async def get_google_trends():
+    """Google Trends 台灣遊戲/二次元熱搜"""
+    data = await gtrends_scraper.fetch_google_trends()
+    return {"data": data, "source": "Google Trends TW"}
+
+
+# ============================================================
 # 系統端點
 # ============================================================
 
@@ -144,6 +155,7 @@ async def root():
             "news": "/api/news",
             "mobile_ios": "/api/mobile/ios",
             "mobile_android": "/api/mobile/android",
+            "google_trends": "/api/google-trends",
         }
     }
 

@@ -1,7 +1,7 @@
 # GameInfo System — Claude 開發上下文
 
 ## 專案概述
-遊戲市場即時輿情追蹤系統。追蹤 Steam 熱門遊戲、Twitch 中文直播熱度、台灣遊戲新聞、討論聲量、手遊排行，並提供歷史趨勢圖與個人追蹤清單。
+遊戲市場即時輿情追蹤系統。追蹤 Steam 熱門遊戲、Twitch 中文直播熱度、台灣遊戲新聞、討論聲量、手遊排行、Google Trends 遊戲/二次元熱搜，並提供歷史趨勢圖。
 
 ## 架構
 
@@ -16,7 +16,8 @@ gameinfo-system/
 │   │   ├── twitch_scraper.py     # Twitch Helix API（language=zh 中文直播）
 │   │   ├── news_scraper.py       # 台灣遊戲新聞（GNN RSS / 4Gamers TW / UDN）
 │   │   ├── discussion_scraper.py # 巴哈姆特 / PTT / 遊戲大亂鬥
-│   │   └── mobile_scraper.py     # App Store / Google Play 手遊排行
+│   │   ├── mobile_scraper.py     # App Store / Google Play 手遊排行
+│   │   └── gtrends_scraper.py    # Google Trends 台灣遊戲/二次元熱搜
 │   ├── cache/        # JSON 快取（+ history.db SQLite）
 │   ├── requirements.txt
 │   └── .env          # 本地環境變數（不進 git）
@@ -29,11 +30,9 @@ gameinfo-system/
         │   ├── TwitchPanel.jsx     # Twitch 中文直播熱度
         │   ├── DiscussionPanel.jsx # 討論聲量
         │   ├── NewsPanel.jsx       # 即時新聞
-        │   ├── MobilePanel.jsx     # 手遊排行
-        │   ├── WatchlistPanel.jsx  # 自訂追蹤清單（Phase 3）
-        │   └── TrendModal.jsx      # 歷史趨勢圖 Modal（Phase 3）
-        └── hooks/
-            └── useWatchlist.js     # localStorage 追蹤清單 hook
+        │   ├── MobilePanel.jsx        # 手遊排行
+        │   ├── GoogleTrendsPanel.jsx # Google Trends 熱搜（Phase 4）
+        │   └── TrendModal.jsx        # 歷史趨勢圖 Modal（Phase 3）
 ```
 
 ## 部署
@@ -69,7 +68,8 @@ GET /api/mobile/ios               # App Store 遊戲排行
 GET /api/mobile/android           # Google Play 遊戲排行
 GET /api/mobile/all               # iOS + Android 合併
 GET /api/history/{source}/{id}?days=  # 歷史趨勢（source: steam|twitch，days: 1-30）
-GET /api/health                   # 健康檢查
+GET /api/google-trends               # Google Trends 台灣遊戲/二次元熱搜
+GET /api/health                      # 健康檢查
 ```
 
 ## 排程頻率
@@ -77,7 +77,7 @@ GET /api/health                   # 健康檢查
 ```
 Steam / 新聞：30 分鐘
 Twitch：15 分鐘
-巴哈/PTT 討論：60 分鐘
+巴哈/PTT 討論 / Google Trends：60 分鐘
 手遊排行：180 分鐘
 ```
 
@@ -85,7 +85,8 @@ Twitch：15 分鐘
 
 - **Phase 1** ✅ Steam 熱門遊戲 / Twitch 直播 / 討論聲量
 - **Phase 2** ✅ 台灣即時新聞 / 手遊排行（iOS + Android）
-- **Phase 3** ✅ 歷史趨勢圖（Recharts LineChart）/ 自訂追蹤清單（localStorage）
+- **Phase 3** ✅ 歷史趨勢圖（Recharts LineChart）
+- **Phase 4** ✅ Google Trends 台灣遊戲/二次元熱搜（取代追蹤清單）
 
 ## 已知限制
 
@@ -93,6 +94,7 @@ Twitch：15 分鐘
 - Twitch `language=zh` 涵蓋台灣/香港中文直播主，並非純台灣
 - Steam 無台灣地區 API，顯示全球排行
 - PTT 爬蟲可能因網路限制不穩定（Zeabur 亞洲節點較佳）
+- Google Trends 使用非官方 API，可能因 Google 反爬機制暫時失效（有 RSS fallback + 快取兜底）
 
 ## 開發慣例
 
@@ -105,4 +107,4 @@ Twitch：15 分鐘
 
 - Backend: Python 3.13, FastAPI, APScheduler, httpx, BeautifulSoup4, feedparser, aiosqlite
 - Frontend: React 18, Vite, Recharts
-- 儲存：JSON 快取（即時資料）+ SQLite `history.db`（歷史趨勢）+ localStorage（追蹤清單）
+- 儲存：JSON 快取（即時資料）+ SQLite `history.db`（歷史趨勢）
