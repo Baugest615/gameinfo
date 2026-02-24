@@ -1,13 +1,15 @@
 """
 每周遊戲行銷摘要模組
 - 目標遊戲：Android 營收 Top 10 + 巴哈熱門版 Top 10（合併去重）
-- 資料來源：4Gamers tag 搜尋 + YouTube Data API + 巴哈遊戲板公告
+- 資料來源：Google News RSS + 4Gamers tag + YouTube Data API + 巴哈遊戲板公告
 - 分類：📢 廣告/行銷 │ 🎉 活動 │ 🤝 聯名合作
 - 時間範圍：過去 14 天（涵蓋進行中活動）
 - 排程：每周一執行一次
 """
 import httpx
 from bs4 import BeautifulSoup
+from collections import Counter
+import feedparser
 import json
 import os
 import sys
@@ -15,6 +17,7 @@ import time
 import re
 import urllib.parse
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 
 TW_TZ = timezone(timedelta(hours=8))
 
@@ -42,10 +45,10 @@ EVENT_KEYWORDS = [
     "節慶", "周年", "春節", "過年", "新年", "維護", "公告", "獎勵", "儲值",
     "轉蛋", "抽獎", "免費", "贈送",
 ]
-COLLAB_KEYWORDS = ["合作", "聯名", "聯動", "跨界", "x ", "×", "攜手", "授權"]
+COLLAB_KEYWORDS = ["合作", "聯名", "聯動", "連動", "跨界", "x ", "×", "攜手", "授權"]
 AD_KEYWORDS = [
     "廣告", "代言", "大使", "宣傳", "PV", "CM", "預告", "trailer",
-    "MV", "形象", "品牌", "官方", "主題曲",
+    "MV", "形象", "品牌", "官方", "主題曲", "贊助", "推廣", "KOL",
 ]
 
 # ── 非遊戲黑名單（巴哈姆特熱門版中的非遊戲板）──
@@ -90,11 +93,83 @@ TAG_ALIASES = {
     "天堂W": ["天堂", "Lineage"],
     "原神": ["Genshin", "Genshin Impact"],
     "神魔之塔": ["Tower of Saviors"],
-    "天堂M": ["Lineage M"],
+    "天堂M": ["Lineage M", "天堂 Mobile"],
     "RO仙境傳説": ["仙境傳說", "RO"],
     "貓咪大戰爭": ["Battle Cats"],
     "星城Online": ["星城"],
 }
+
+# ── 常見手遊 BSN 對照（補巴哈熱門版未涵蓋的遊戲）──
+KNOWN_BSN = {
+    "傳說對決": "30518",
+    "天堂M": "25908",
+    "寒霜啟示錄": "76999",
+    "Kingshot": "82382",
+    "RO仙境傳説": "28924",
+    "最後的戰爭": "79869",
+    "貓咪大戰爭": "23772",
+    "神魔之塔": "23805",
+    "原神": "36730",
+    "崩壞：星穹鐵道": "75165",
+    "勝利女神：妮姬": "74498",
+    "明日方舟：終末地": "74604",
+    "蔚藍檔案 Blue Archive": "73498",
+}
+
+
+async def _search_bsn(client: httpx.AsyncClient, game_name: str) -> str | None:
+    """自動搜尋巴哈姆特遊戲板 BSN：ACG 搜尋 + 板頁標題驗證"""
+    encoded = urllib.parse.quote(game_name)
+    try:
+        resp = await client.get(
+            f"https://acg.gamer.com.tw/search.php?s=3&kw={encoded}",
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            return None
+    except Exception:
+        return None
+
+    bsn_list = re.findall(r'(?:G2|C|B)\.php\?bsn=0*(\d+)', resp.text)
+    counter = Counter(bsn_list)
+    candidates = [bsn for bsn, _ in counter.most_common(5)]
+    if not candidates:
+        return None
+
+    # 產生所有可能的匹配名稱（含 TAG_ALIASES 變體 + CJK base）
+    match_names = {game_name.lower()}
+    for canonical, aliases in TAG_ALIASES.items():
+        all_names = [canonical] + aliases
+        if any(n in game_name or game_name in n for n in all_names):
+            for n in all_names:
+                match_names.add(n.lower())
+            break
+    cjk_base = re.sub(r'[^\u4e00-\u9fff]', '', game_name)
+    if len(cjk_base) >= 2:
+        match_names.add(cjk_base)
+
+    # 逐一驗證候選 BSN：板頁標題/描述必須包含遊戲名稱
+    for bsn in candidates:
+        try:
+            resp2 = await client.get(
+                f"https://forum.gamer.com.tw/B.php?bsn={bsn}",
+                timeout=10,
+            )
+            if resp2.status_code != 200:
+                continue
+            soup = BeautifulSoup(resp2.text, "html.parser")
+            title_el = soup.select_one("title")
+            page_title = (title_el.get_text() if title_el else "").lower()
+            meta = soup.select_one('meta[name="description"]')
+            desc = (meta.get("content", "") if meta else "").lower()
+            full = page_title + " " + desc
+
+            if any(name in full for name in match_names):
+                _log(f"[WeeklyDigest] Auto-BSN: {game_name} -> bsn={bsn}")
+                return bsn
+        except Exception:
+            continue
+    return None
 
 
 def _classify_item(title: str, summary: str = "") -> list[str]:
@@ -190,9 +265,28 @@ async def _get_target_games() -> list[dict]:
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         _log("[WeeklyDigest] Discussion cache not found, skipping Bahamut")
 
+    # 3. 自動搜尋巴哈 BSN（ACG 搜尋 + 板頁驗證）
+    missing_bsn = [g for g in games if g["bsn"] is None]
+    if missing_bsn:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True, headers=HEADERS) as client:
+            for game in missing_bsn:
+                found = await _search_bsn(client, game["name"])
+                if found:
+                    game["bsn"] = found
+
+    # 4. 用 KNOWN_BSN 硬編碼補上仍缺 bsn 的遊戲（最終兜底）
+    for game in games:
+        if game["bsn"] is None:
+            for known_name, known_bsn in KNOWN_BSN.items():
+                if game["name"] in known_name or known_name in game["name"]:
+                    game["bsn"] = known_bsn
+                    break
+
+    with_bsn = len([g for g in games if g["bsn"]])
     _log(f"[WeeklyDigest] Target games: {len(games)} "
          f"({len([g for g in games if g['source'] == 'android_grossing'])} Android + "
-         f"{len([g for g in games if g['source'] == 'bahamut_hot'])} Bahamut)")
+         f"{len([g for g in games if g['source'] == 'bahamut_hot'])} Bahamut), "
+         f"{with_bsn} with BSN")
     return games
 
 
@@ -262,11 +356,20 @@ async def _search_youtube(client: httpx.AsyncClient, game_name: str, since: date
         return []
 
     results = []
+    # 聚焦行銷相關搜尋（活動/聯名/廣告），不搜「官方」避免拉到一般影片
     queries = [
-        f"{game_name} 官方",
-        f"{game_name} 廣告 PV trailer",
+        f"{game_name} 活動 聯名",
+        f"{game_name} 廣告 PV CM",
     ]
     published_after = since.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # 排除非行銷內容
+    yt_skip_words = [
+        "實況", "直播", "攻略", "教學", "開箱", "心得", "評測", "review",
+        "gameplay", "walkthrough", "let's play", "分享", "試玩", "體驗",
+        "比較", "推薦", "tier list", "通關", "挑戰", "抽卡", "課金",
+        "pvp", "pve", "組隊", "配裝", "懶人包",
+    ]
 
     for q in queries:
         try:
@@ -280,7 +383,7 @@ async def _search_youtube(client: httpx.AsyncClient, game_name: str, since: date
                     "regionCode": "TW",
                     "relevanceLanguage": "zh-Hant",
                     "maxResults": 5,
-                    "order": "date",
+                    "order": "relevance",
                     "key": api_key,
                 },
                 timeout=15,
@@ -297,9 +400,14 @@ async def _search_youtube(client: httpx.AsyncClient, game_name: str, since: date
                 video_id = item.get("id", {}).get("videoId", "")
                 published = snippet.get("publishedAt", "")
 
-                # 排除純實況/攻略
-                skip_words = ["實況", "直播", "攻略", "教學", "開箱", "gameplay", "walkthrough", "let's play"]
-                if any(sw in title.lower() for sw in skip_words):
+                title_lower = title.lower()
+                # 排除攻略/實況類
+                if any(sw in title_lower for sw in yt_skip_words):
+                    continue
+
+                # 必須包含至少一個行銷相關關鍵字
+                marketing_kws = EVENT_KEYWORDS + COLLAB_KEYWORDS + AD_KEYWORDS
+                if not any(kw.lower() in title_lower for kw in marketing_kws):
                     continue
 
                 results.append({
@@ -342,10 +450,16 @@ async def _search_bahamut_board(client: httpx.AsyncClient, bsn: str, game_name: 
         results = []
         seen_titles = set()
 
-        # 活動/公告相關關鍵字
-        board_event_kws = [
-            "活動", "公告", "官方", "更新", "維護", "聯名", "合作", "限定",
-            "開跑", "獎勵", "免費", "贈送", "預告", "新版", "改版", "賽事",
+        # 只保留情報/公告類貼文前綴
+        allow_prefixes = ["【情報】", "【公告】", "【官方】", "精華"]
+        # 排除攻略/心得/閒聊/問題
+        deny_prefixes = ["【心得】", "【攻略】", "【閒聊】", "【問題】", "【密技】", "【討論】"]
+
+        # 行銷相關關鍵字（title 必須包含至少一個）
+        marketing_kws = [
+            "活動", "公告", "更新", "維護", "聯名", "合作", "限定",
+            "開跑", "獎勵", "贈送", "預告", "改版", "賽事", "代言",
+            "廣告", "PV", "新角色", "新版本", "聯動", "跨界",
         ]
 
         for a in soup.select("a[href]"):
@@ -357,8 +471,18 @@ async def _search_bahamut_board(client: httpx.AsyncClient, bsn: str, game_name: 
             if not title or len(title) < 5 or title in seen_titles:
                 continue
 
-            # 篩選活動/公告相關
-            if not any(kw in title for kw in board_event_kws):
+            # 排除心得/攻略/閒聊
+            if any(title.startswith(p) for p in deny_prefixes):
+                continue
+
+            # 必須是情報/公告類，或包含行銷關鍵字
+            is_info_post = any(title.startswith(p) for p in allow_prefixes)
+            has_marketing_kw = any(kw in title for kw in marketing_kws)
+            if not is_info_post and not has_marketing_kw:
+                continue
+
+            # 即使是情報貼，也要有行銷內容（排除純數據/排行情報）
+            if is_info_post and not has_marketing_kw:
                 continue
 
             seen_titles.add(title)
@@ -370,17 +494,167 @@ async def _search_bahamut_board(client: httpx.AsyncClient, bsn: str, game_name: 
                 "url": href,
                 "summary": f"巴哈 {game_name} 板",
                 "source": "巴哈討論板",
-                "published_at": "",  # 巴哈板文時間較難取得
+                "published_at": "",
                 "tags": _classify_item(title),
             })
 
-            if len(results) >= 10:
+            if len(results) >= 8:
                 break
 
         return results
     except Exception as e:
         _log(f"[WeeklyDigest] Bahamut board error for bsn={bsn}: {e}")
         return []
+
+
+# ============================================================
+# 來源 4: Google News RSS — 跨媒體新聞聚合（最廣覆蓋）
+# ============================================================
+async def _search_google_news(client: httpx.AsyncClient, game_name: str, since: datetime) -> list[dict]:
+    """透過 Google News RSS 搜尋遊戲相關行銷新聞（不需 API key）"""
+    # 用純遊戲名稱搜尋（不加關鍵字限制），讓 post-filter 處理相關性
+    encoded = urllib.parse.quote(f'"{game_name}"')
+    url = f"https://news.google.com/rss/search?q={encoded}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+
+    try:
+        resp = await client.get(url, timeout=15)
+        if resp.status_code != 200:
+            return []
+    except Exception:
+        return []
+
+    feed = feedparser.parse(resp.text)
+    results = []
+
+    # 非行銷噪音關鍵字（排除犯罪新聞、股市、純電競賽事等無關報導）
+    noise_keywords = [
+        "性侵", "詐騙", "犯罪", "逮捕", "判刑", "起訴", "酒駕",
+        "股價", "財報", "營收報告", "法說會",
+    ]
+
+    for entry in feed.entries:
+        title = entry.get("title", "")
+        link = entry.get("link", "")
+        source_name = ""
+        if hasattr(entry, "source"):
+            source_name = entry.source.get("title", "") if isinstance(entry.source, dict) else str(entry.source)
+        pub_str = entry.get("published", "")
+
+        # 解析日期，過濾超出範圍的
+        pub_dt = None
+        try:
+            pub_dt = parsedate_to_datetime(pub_str)
+            if pub_dt < since:
+                continue
+        except Exception:
+            pass  # 無法解析日期的仍保留
+
+        # 排除噪音
+        if any(kw in title for kw in noise_keywords):
+            continue
+
+        # 必須包含行銷相關關鍵字
+        marketing_kws = EVENT_KEYWORDS + COLLAB_KEYWORDS + AD_KEYWORDS
+        if not any(kw in title for kw in marketing_kws):
+            continue
+
+        tags = _classify_item(title)
+
+        # 清理標題（Google News 會在末尾加 " - 來源名"）
+        clean_title = title.rsplit(" - ", 1)[0].strip() if " - " in title else title
+
+        results.append({
+            "title": clean_title,
+            "url": link,
+            "summary": f"來源：{source_name}" if source_name else "",
+            "source": "Google News",
+            "published_at": pub_dt.strftime("%Y-%m-%dT%H:%M:%S") if pub_dt else "",
+            "tags": tags,
+        })
+
+        if len(results) >= 15:
+            break
+
+    return results
+
+
+# ============================================================
+# 來源 5: Google Custom Search — Facebook/IG 官方社群貼文
+# ============================================================
+async def _search_social_posts(client: httpx.AsyncClient, game_name: str, since: datetime) -> list[dict]:
+    """透過 Google Custom Search API 搜尋 Facebook/IG 公開貼文（免 FB API 審核）"""
+    api_key = os.getenv("GOOGLE_CSE_KEY", "")
+    cx = os.getenv("GOOGLE_CSE_CX", "")
+    if not api_key or not cx:
+        return []
+
+    results = []
+    days_back = (datetime.now(TW_TZ) - since).days
+
+    try:
+        resp = await client.get(
+            "https://www.googleapis.com/customsearch/v1",
+            params={
+                "key": api_key,
+                "cx": cx,
+                "q": f'"{game_name}" 活動 OR 聯名 OR 合作 OR 更新',
+                "dateRestrict": f"d{days_back}",
+                "lr": "lang_zh-TW",
+                "num": 10,
+            },
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            _log(f"[WeeklyDigest] Google CSE error {resp.status_code}")
+            return []
+
+        data = resp.json()
+    except Exception as e:
+        _log(f"[WeeklyDigest] Google CSE request failed: {e}")
+        return []
+
+    # 非行銷噪音
+    noise_keywords = [
+        "性侵", "詐騙", "犯罪", "逮捕", "判刑", "起訴",
+        "買賣", "代儲", "代打", "徵人", "收購",
+    ]
+
+    for item in data.get("items", []):
+        title = item.get("title", "")
+        link = item.get("link", "")
+        snippet = item.get("snippet", "")
+
+        combined = f"{title} {snippet}"
+
+        # 排除噪音
+        if any(kw in combined for kw in noise_keywords):
+            continue
+
+        # 必須包含行銷關鍵字
+        marketing_kws = EVENT_KEYWORDS + COLLAB_KEYWORDS + AD_KEYWORDS
+        if not any(kw in combined for kw in marketing_kws):
+            continue
+
+        tags = _classify_item(title, snippet)
+
+        # 標記來源
+        if "instagram.com" in link:
+            source_label = "Instagram"
+        elif "facebook.com" in link:
+            source_label = "Facebook"
+        else:
+            source_label = "社群搜尋"
+
+        results.append({
+            "title": title,
+            "url": link,
+            "summary": snippet[:120] if snippet else "",
+            "source": source_label,
+            "published_at": "",
+            "tags": tags,
+        })
+
+    return results
 
 
 # ============================================================
@@ -403,22 +677,35 @@ async def fetch_weekly_digest() -> dict:
             bsn = game.get("bsn")
             _log(f"[WeeklyDigest] Searching: {name} (bsn={bsn})")
 
-            # 來源 1: 4Gamers tag 搜尋
+            # 來源 1: Google News RSS（最廣覆蓋）
+            gnews_items = await _search_google_news(client, name, start_time)
+
+            # 來源 2: Facebook/IG 官方社群（Bing 搜尋公開貼文）
+            fb_items = await _search_social_posts(client, name, start_time)
+
+            # 來源 3: 4Gamers tag 搜尋
             fgamers_items = await _search_4gamers(client, name, start_time)
 
-            # 來源 2: YouTube 官方影音
+            # 來源 4: YouTube 官方影音
             yt_items = await _search_youtube(client, name, start_time)
 
-            # 來源 3: 巴哈遊戲板活動公告
+            # 來源 5: 巴哈遊戲板活動公告
             baha_items = await _search_bahamut_board(client, bsn, name)
 
-            all_items = fgamers_items + yt_items + baha_items
+            all_items = gnews_items + fb_items + fgamers_items + yt_items + baha_items
 
             if not all_items:
                 continue
 
             # 跨來源去重（用標題相似度）
             all_items = _dedup_items(all_items)
+
+            # 只保留有行銷標籤的項目（移除純 "news" 分類）
+            all_items = [item for item in all_items
+                         if item.get("tags") != ["news"]]
+
+            if not all_items:
+                continue
 
             # 按發佈時間排序（無時間的排最後）
             all_items.sort(key=lambda x: x.get("published_at") or "0000", reverse=True)
@@ -437,6 +724,8 @@ async def fetch_weekly_digest() -> dict:
                 "item_count": len(all_items),
                 "tag_counts": tag_counts,
                 "sources_used": {
+                    "google_news": len(gnews_items),
+                    "facebook": len(fb_items),
                     "4gamers": len(fgamers_items),
                     "youtube": len(yt_items),
                     "bahamut": len(baha_items),

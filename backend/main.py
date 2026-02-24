@@ -158,7 +158,7 @@ async def get_google_trends():
 async def get_weekly_digest():
     """每周遊戲行銷摘要（廣告/活動/聯名），只讀快取（由排程更新）"""
     data = weekly_digest_scraper._load_cache()
-    return {"data": data, "source": "4Gamers/YouTube/巴哈板"}
+    return {"data": data, "source": "Google News/4Gamers/YouTube/巴哈板"}
 
 
 # ============================================================
