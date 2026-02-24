@@ -347,6 +347,18 @@ async def _search_4gamers(client: httpx.AsyncClient, game_name: str, since: date
         return []
 
     since_ts = int(since.timestamp() * 1000)
+
+    # 排除非行銷內容
+    noise_keywords = [
+        "性侵", "詐騙", "犯罪", "逮捕", "判刑", "起訴",
+        "買賣", "代儲", "代打", "徵人", "收購",
+    ]
+    skip_words = [
+        "評測", "review", "心得", "開箱", "攻略", "教學",
+        "tier list", "比較", "推薦", "懶人包",
+    ]
+    marketing_kws = EVENT_KEYWORDS + COLLAB_KEYWORDS + AD_KEYWORDS
+
     results = []
     for item in items:
         ts = item.get("createPublishedAt", 0)
@@ -354,6 +366,24 @@ async def _search_4gamers(client: httpx.AsyncClient, game_name: str, since: date
             continue
         title = item.get("title", "")
         intro = item.get("intro", "") or ""
+        combined = f"{title} {intro}".lower()
+
+        # 標題必須包含遊戲名稱
+        if not _title_contains_game(title, game_name):
+            continue
+
+        # 排除噪音
+        if any(kw in combined for kw in noise_keywords):
+            continue
+
+        # 排除非行銷內容（評測/攻略等）
+        if any(kw in combined for kw in skip_words):
+            continue
+
+        # 必須包含行銷相關關鍵字
+        if not any(kw.lower() in combined for kw in marketing_kws):
+            continue
+
         results.append({
             "title": title,
             "url": item.get("canonicalUrl", ""),
