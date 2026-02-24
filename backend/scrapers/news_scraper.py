@@ -11,6 +11,7 @@ import json
 import os
 import time
 import hashlib
+from email.utils import parsedate_to_datetime
 
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cache")
 CACHE_FILE = os.path.join(CACHE_DIR, "news_data.json")
@@ -37,6 +38,14 @@ async def fetch_gnn_rss():
         feed = feedparser.parse(resp.text)
         news = []
         for entry in feed.entries[:PER_SOURCE]:
+            # 將 RSS 日期格式轉為 ISO 8601
+            pub_raw = entry.get("published", "")
+            pub_iso = ""
+            if pub_raw:
+                try:
+                    pub_iso = parsedate_to_datetime(pub_raw).strftime("%Y-%m-%dT%H:%M:%S")
+                except Exception:
+                    pub_iso = pub_raw
             news.append({
                 "id": _news_hash(entry.get("title", ""), "GNN"),
                 "title": entry.get("title", ""),
@@ -44,7 +53,7 @@ async def fetch_gnn_rss():
                 "summary": entry.get("summary", "")[:100],
                 "source": "巴哈姆特 GNN",
                 "source_icon": "🎮",
-                "published_at": entry.get("published", ""),
+                "published_at": pub_iso,
                 "fetched_at": int(time.time()),
             })
         return news
