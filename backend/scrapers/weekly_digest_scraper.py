@@ -39,16 +39,16 @@ HEADERS = {
     "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8",
 }
 
-# ── 分類關鍵字 ──
+# ── 行銷分類關鍵字（僅行銷/推廣活動，排除營運公告/版更等）──
 EVENT_KEYWORDS = [
-    "活動", "限定", "開跑", "登場", "開放", "更新", "改版", "版本", "賽季",
-    "節慶", "周年", "春節", "過年", "新年", "維護", "公告", "獎勵", "儲值",
-    "轉蛋", "抽獎", "免費", "贈送",
+    "活動", "限定", "開跑", "登場", "開放", "賽季",
+    "節慶", "周年", "週年", "春節", "過年", "新年", "獎勵", "儲值",
+    "轉蛋", "抽獎", "免費", "贈送", "造型", "禮包",
 ]
 COLLAB_KEYWORDS = ["合作", "聯名", "聯動", "連動", "跨界", "x ", "×", "攜手", "授權"]
 AD_KEYWORDS = [
     "廣告", "代言", "大使", "宣傳", "PV", "CM", "預告", "trailer",
-    "MV", "形象", "品牌", "官方", "主題曲", "贊助", "推廣", "KOL",
+    "MV", "形象", "品牌", "主題曲", "贊助", "推廣", "KOL",
 ]
 
 # ── 非遊戲黑名單（巴哈姆特熱門版中的非遊戲板）──
@@ -504,18 +504,28 @@ async def _search_bahamut_board(client: httpx.AsyncClient, bsn: str, game_name: 
         results = []
         seen_titles = set()
 
-        # 只保留情報/公告類貼文前綴
-        allow_prefixes = ["【情報】", "【公告】", "【官方】", "精華"]
-        # 排除攻略/心得/閒聊/問題
-        deny_prefixes = ["【心得】", "【攻略】", "【閒聊】", "【問題】", "【密技】", "【討論】"]
+        # 只保留情報類貼文前綴
+        allow_prefixes = ["【情報】", "【官方】", "【活動】"]
+        # 排除非行銷類貼文
+        deny_prefixes = [
+            "【心得】", "【攻略】", "【閒聊】", "【問題】",
+            "【密技】", "【討論】", "【公告】", "【其他】",
+            "【造型】", "【分享】", "【集中】", "【數據】",
+        ]
+
+        # 板務/行政類關鍵字（直接排除）
+        admin_skip_kws = [
+            "板主", "板規", "哈啦區", "發文規則", "申請人", "看板規範",
+            "站規", "版規", "徵板主", "子板", "輕鬆不放縱",
+            "集中串規則", "發文注意", "板務",
+        ]
 
         # 行銷相關關鍵字（title 必須包含至少一個）
-        # 注意：「更新」「公告」「維護」太泛，會拉入純遊戲公告，不屬於行銷
         marketing_kws = [
             "活動", "聯名", "合作", "限定", "聯動", "連動", "跨界",
             "開跑", "獎勵", "贈送", "免費", "預告", "賽事", "代言",
             "廣告", "PV", "主題曲", "贊助", "周年", "週年", "節慶",
-            "春節", "新年", "造型", "儲值", "抽獎",
+            "春節", "新年", "造型", "儲值", "抽獎", "禮包",
         ]
 
         for a in soup.select("a[href]"):
@@ -527,12 +537,31 @@ async def _search_bahamut_board(client: httpx.AsyncClient, bsn: str, game_name: 
             if not title or len(title) < 5 or title in seen_titles:
                 continue
 
-            # 排除心得/攻略/閒聊
-            if any(title.startswith(p) for p in deny_prefixes):
+            # 排除板務/行政貼文
+            if any(kw in title for kw in admin_skip_kws):
                 continue
 
-            # 必須是情報/公告類，或包含行銷關鍵字
-            is_info_post = any(title.startswith(p) for p in allow_prefixes)
+            # 處理「精華」前綴：去掉後判斷真實分類
+            # 巴哈的精華標記前有 icon font (\ue838 等 PUA 字元)，需一併清除
+            core_title = re.sub(r'[\ue000-\uf8ff]', '', title).strip()
+            if core_title.startswith("精華"):
+                core_title = core_title[2:].strip()
+
+            # 排除非行銷類前綴
+            if any(core_title.startswith(p) for p in deny_prefixes):
+                continue
+
+            # 排除玩家社群類內容（非官方行銷）
+            player_skip_kws = [
+                "集中串", "互助區", "交換", "徵人", "徵友", "找人",
+                "贈送串", "分享串", "集中討論", "捏臉", "捏角",
+                "序號分享", "人品爆炸",
+            ]
+            if any(kw in title for kw in player_skip_kws):
+                continue
+
+            # 必須是情報類，或包含行銷關鍵字
+            is_info_post = any(core_title.startswith(p) for p in allow_prefixes)
             has_marketing_kw = any(kw in title for kw in marketing_kws)
             if not is_info_post and not has_marketing_kw:
                 continue

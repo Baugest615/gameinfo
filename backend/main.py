@@ -161,6 +161,13 @@ async def get_weekly_digest():
     return {"data": data, "source": "Google News/4Gamers/YouTube/巴哈板"}
 
 
+@app.post("/api/weekly-digest/refresh", tags=["每周摘要"])
+async def refresh_weekly_digest():
+    """手動觸發重新生成每周行銷摘要"""
+    data = await weekly_digest_scraper.fetch_weekly_digest()
+    return {"data": data, "source": "Google News/4Gamers/YouTube/巴哈板"}
+
+
 # ============================================================
 # 系統端點
 # ============================================================
