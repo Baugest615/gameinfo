@@ -156,9 +156,9 @@ async def get_google_trends():
 
 @app.get("/api/weekly-digest", tags=["每周摘要"])
 async def get_weekly_digest():
-    """每周遊戲行銷摘要（廣告/活動/聯名），來源：Android 營收 Top 10 + 巴哈熱門版 Top 10"""
-    data = await weekly_digest_scraper.fetch_weekly_digest()
-    return {"data": data, "source": "4Gamers/YouTube"}
+    """每周遊戲行銷摘要（廣告/活動/聯名），只讀快取（由排程更新）"""
+    data = weekly_digest_scraper._load_cache()
+    return {"data": data, "source": "4Gamers/YouTube/巴哈板"}
 
 
 # ============================================================

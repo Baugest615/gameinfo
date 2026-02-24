@@ -78,6 +78,25 @@ def update_weekly_digest():
     _run_async(weekly_digest_scraper.fetch_weekly_digest())
 
 
+def _init_weekly_digest():
+    """啟動時先確保依賴快取存在，再跑 weekly digest"""
+    import os
+    cache_dir = os.path.join(os.path.dirname(__file__), "cache")
+    mobile_cache = os.path.join(cache_dir, "mobile_data.json")
+    disc_cache = os.path.join(cache_dir, "discussion_data.json")
+
+    # 先確保 mobile + discussion 快取存在
+    if not os.path.exists(mobile_cache):
+        print("[Scheduler] Init: fetching mobile data first...")
+        update_mobile()
+    if not os.path.exists(disc_cache):
+        print("[Scheduler] Init: fetching discussion data first...")
+        update_discussions()
+
+    print("[Scheduler] Init: now fetching weekly digest...")
+    update_weekly_digest()
+
+
 def start_scheduler():
     """啟動定時排程"""
     scheduler.add_job(update_steam, "interval", minutes=30, id="steam", replace_existing=True)
@@ -89,14 +108,12 @@ def start_scheduler():
 
     scheduler.start()
 
-    # 首次啟動時延遲 5 分鐘執行每周摘要（等 mobile/discussion 快取先建立）
-    import os
-    from datetime import datetime, timedelta
+    # 首次啟動：若 weekly digest 快取不存在或為空，排程初始化
+    import os, json
     cache_file = os.path.join(os.path.dirname(__file__), "cache", "weekly_digest.json")
     need_init = not os.path.exists(cache_file)
     if not need_init:
         try:
-            import json
             with open(cache_file, "r", encoding="utf-8") as f:
                 cached = json.load(f)
             if cached.get("total_items", 0) == 0:
@@ -104,9 +121,8 @@ def start_scheduler():
         except Exception:
             need_init = True
     if need_init:
-        run_at = datetime.now() + timedelta(minutes=5)
-        scheduler.add_job(update_weekly_digest, "date", run_date=run_at, id="weekly_digest_init", replace_existing=True)
-        print("[Scheduler] Weekly digest init scheduled in 5 minutes (waiting for other caches)")
+        scheduler.add_job(_init_weekly_digest, id="weekly_digest_init", replace_existing=True)
+        print("[Scheduler] Weekly digest init queued (will fetch dependencies first)")
 
     print("[Scheduler] Started - Steam/News: 30min, Twitch: 15min, Discussions: 60min, Mobile: 180min, WeeklyDigest: Mon 06:00")
 
