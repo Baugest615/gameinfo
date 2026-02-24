@@ -163,10 +163,24 @@ body {
   color: var(--accent-red);
 }
 
+.header__time-area {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
 .header__time {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.header__credit {
+  font-size: 9px;
+  color: var(--text-muted);
+  opacity: 0.5;
   white-space: nowrap;
 }
 

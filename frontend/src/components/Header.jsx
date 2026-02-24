@@ -45,7 +45,10 @@ export default function Header({ steamData }) {
         </div>
       </div>
 
-      <div className="header__time">{time}</div>
+      <div className="header__time-area">
+        <div className="header__time">{time}</div>
+        <div className="header__credit">created by 法蘭奇</div>
+      </div>
     </header>
   )
 }
