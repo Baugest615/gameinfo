@@ -172,6 +172,26 @@ async def _search_bsn(client: httpx.AsyncClient, game_name: str) -> str | None:
     return None
 
 
+def _title_contains_game(title: str, game_name: str) -> bool:
+    """檢查標題是否包含遊戲名稱（含別名 + CJK 核心字）"""
+    t = title.lower()
+    # 主名稱
+    if game_name.lower() in t:
+        return True
+    # TAG_ALIASES 別名
+    for canonical, aliases in TAG_ALIASES.items():
+        all_names = [canonical] + aliases
+        if any(n.lower() in game_name.lower() or game_name.lower() in n.lower() for n in all_names):
+            if any(alias.lower() in t for alias in all_names):
+                return True
+            break
+    # CJK 核心字（至少 2 字的中文部分）
+    cjk = re.sub(r'[^\u4e00-\u9fff]', '', game_name)
+    if len(cjk) >= 2 and cjk in title:
+        return True
+    return False
+
+
 def _classify_item(title: str, summary: str = "") -> list[str]:
     """根據標題和摘要分類消息類型"""
     text = f"{title} {summary}".lower()
@@ -400,6 +420,10 @@ async def _search_youtube(client: httpx.AsyncClient, game_name: str, since: date
                 video_id = item.get("id", {}).get("videoId", "")
                 published = snippet.get("publishedAt", "")
 
+                # 標題必須包含遊戲名稱（防止 YT 推薦無關影片）
+                if not _title_contains_game(title, game_name):
+                    continue
+
                 title_lower = title.lower()
                 # 排除攻略/實況類
                 if any(sw in title_lower for sw in yt_skip_words):
@@ -456,10 +480,12 @@ async def _search_bahamut_board(client: httpx.AsyncClient, bsn: str, game_name: 
         deny_prefixes = ["【心得】", "【攻略】", "【閒聊】", "【問題】", "【密技】", "【討論】"]
 
         # 行銷相關關鍵字（title 必須包含至少一個）
+        # 注意：「更新」「公告」「維護」太泛，會拉入純遊戲公告，不屬於行銷
         marketing_kws = [
-            "活動", "公告", "更新", "維護", "聯名", "合作", "限定",
-            "開跑", "獎勵", "贈送", "預告", "改版", "賽事", "代言",
-            "廣告", "PV", "新角色", "新版本", "聯動", "跨界",
+            "活動", "聯名", "合作", "限定", "聯動", "連動", "跨界",
+            "開跑", "獎勵", "贈送", "免費", "預告", "賽事", "代言",
+            "廣告", "PV", "主題曲", "贊助", "周年", "週年", "節慶",
+            "春節", "新年", "造型", "儲值", "抽獎",
         ]
 
         for a in soup.select("a[href]"):
@@ -539,6 +565,10 @@ async def _search_google_news(client: httpx.AsyncClient, game_name: str, since: 
         if hasattr(entry, "source"):
             source_name = entry.source.get("title", "") if isinstance(entry.source, dict) else str(entry.source)
         pub_str = entry.get("published", "")
+
+        # 標題必須包含遊戲名稱（防止混入其他遊戲的新聞）
+        if not _title_contains_game(title, game_name):
+            continue
 
         # 解析日期，過濾超出範圍的
         pub_dt = None
@@ -623,6 +653,10 @@ async def _search_social_posts(client: httpx.AsyncClient, game_name: str, since:
         title = item.get("title", "")
         link = item.get("link", "")
         snippet = item.get("snippet", "")
+
+        # 標題或摘要必須包含遊戲名稱
+        if not _title_contains_game(f"{title} {snippet}", game_name):
+            continue
 
         combined = f"{title} {snippet}"
 
