@@ -48,6 +48,36 @@ AD_KEYWORDS = [
     "MV", "形象", "品牌", "官方", "主題曲",
 ]
 
+# ── 非遊戲黑名單（巴哈姆特熱門版中的非遊戲板）──
+BOARD_BLACKLIST = [
+    "電腦應用綜合討論", "場外休憩區", "哈啦板務", "動漫戲劇綜合",
+    "智慧型手機", "電腦硬體", "模型公仔", "生活娛樂",
+]
+
+# ── 博弈/非遊戲 App 關鍵字過濾 ──
+GAME_NAME_BLACKLIST_KW = ["娛樂城", "麻將", "老虎機", "刮刮樂", "博弈", "棋牌"]
+
+# ── 遊戲名稱清理：去前綴/副標題，取核心名稱 ──
+NAME_PREFIXES = ["Garena ", "SEGA ", "miHoYo ", "Netmarble "]
+
+def _clean_game_name(raw_name: str) -> str:
+    """清理遊戲名稱：去掉發行商前綴和副標題"""
+    name = raw_name.strip()
+    # 去掉發行商前綴
+    for prefix in NAME_PREFIXES:
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+            break
+    # 去掉副標題（：或 - 後的描述性文字）
+    for sep in ["：", " - ", "—"]:
+        if sep in name:
+            base = name.split(sep)[0].strip()
+            # 保留有意義的短名（至少 2 字）
+            if len(base) >= 2:
+                name = base
+                break
+    return name
+
 # ── 4Gamers tag 名稱對照表 ──
 TAG_ALIASES = {
     "勝利女神：妮姬": ["NIKKE", "勝利女神"],
@@ -59,6 +89,11 @@ TAG_ALIASES = {
     "傳說對決": ["AOV", "Arena of Valor"],
     "天堂W": ["天堂", "Lineage"],
     "原神": ["Genshin", "Genshin Impact"],
+    "神魔之塔": ["Tower of Saviors"],
+    "天堂M": ["Lineage M"],
+    "RO仙境傳説": ["仙境傳說", "RO"],
+    "貓咪大戰爭": ["Battle Cats"],
+    "星城Online": ["星城"],
 }
 
 
@@ -101,7 +136,13 @@ async def _get_target_games() -> list[dict]:
             mobile_data = json.load(f)
         android_grossing = mobile_data.get("android", {}).get("grossing", [])
         for item in android_grossing[:10]:
-            name = item.get("name", "").strip()
+            raw_name = item.get("name", "").strip()
+            if not raw_name:
+                continue
+            # 過濾博弈類
+            if any(kw in raw_name for kw in GAME_NAME_BLACKLIST_KW):
+                continue
+            name = _clean_game_name(raw_name)
             if name and name not in seen_names:
                 seen_names.add(name)
                 games.append({
@@ -125,7 +166,12 @@ async def _get_target_games() -> list[dict]:
 
         for item in bahamut_boards[:10]:
             name = item.get("name", "").strip()
-            if name and name not in seen_names:
+            if not name:
+                continue
+            # 過濾非遊戲板
+            if name in BOARD_BLACKLIST:
+                continue
+            if name not in seen_names:
                 seen_names.add(name)
                 games.append({
                     "name": name,
@@ -151,11 +197,13 @@ async def _get_target_games() -> list[dict]:
 
 
 def _get_tag_variants(game_name: str) -> list[str]:
-    """取得遊戲名稱的所有可能 tag 變體"""
+    """取得遊戲名稱的所有可能 tag 變體（支援子字串匹配）"""
     variants = [game_name]
     for canonical, aliases in TAG_ALIASES.items():
-        if game_name == canonical or game_name in aliases:
-            variants = [canonical] + aliases
+        all_names = [canonical] + aliases
+        # 子字串匹配：遊戲名稱包含 canonical/alias，或反過來
+        if any(n in game_name or game_name in n for n in all_names):
+            variants = [canonical] + aliases + [game_name]
             break
     return list(set(variants))
 
