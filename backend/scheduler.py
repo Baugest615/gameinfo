@@ -89,11 +89,24 @@ def start_scheduler():
 
     scheduler.start()
 
-    # 首次啟動時也執行一次每周摘要（若快取不存在）
+    # 首次啟動時延遲 5 分鐘執行每周摘要（等 mobile/discussion 快取先建立）
     import os
+    from datetime import datetime, timedelta
     cache_file = os.path.join(os.path.dirname(__file__), "cache", "weekly_digest.json")
-    if not os.path.exists(cache_file):
-        scheduler.add_job(update_weekly_digest, id="weekly_digest_init", replace_existing=True)
+    need_init = not os.path.exists(cache_file)
+    if not need_init:
+        try:
+            import json
+            with open(cache_file, "r", encoding="utf-8") as f:
+                cached = json.load(f)
+            if cached.get("total_items", 0) == 0:
+                need_init = True
+        except Exception:
+            need_init = True
+    if need_init:
+        run_at = datetime.now() + timedelta(minutes=5)
+        scheduler.add_job(update_weekly_digest, "date", run_date=run_at, id="weekly_digest_init", replace_existing=True)
+        print("[Scheduler] Weekly digest init scheduled in 5 minutes (waiting for other caches)")
 
     print("[Scheduler] Started - Steam/News: 30min, Twitch: 15min, Discussions: 60min, Mobile: 180min, WeeklyDigest: Mon 06:00")
 
