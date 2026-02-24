@@ -14,8 +14,8 @@ import hashlib
 
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cache")
 CACHE_FILE = os.path.join(CACHE_DIR, "news_data.json")
-MAX_NEWS = 50
-PER_SOURCE = 25  # 每來源最多抓取數量，3 來源 × 25 = 75，去重後可達 50
+MAX_NEWS = 100
+PER_SOURCE = 35  # 每來源最多抓取數量，3 來源 × 35 = 105，去重後可達 100
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -54,38 +54,33 @@ async def fetch_gnn_rss():
 
 
 async def fetch_4gamers_tw():
-    """4Gamers TW 台灣遊戲新聞"""
-    url = "https://www.4gamers.com.tw/site/column/latest-news"
+    """4Gamers TW 台灣遊戲新聞（JSON API）"""
+    url = f"https://www.4gamers.com.tw/site/api/news/latest?pageSize={PER_SOURCE}"
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             resp = await client.get(url, headers=HEADERS)
             resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
+        data = resp.json()
+        results = data.get("data", {}).get("results", [])
         news = []
-        seen = set()
-
-        for a in soup.select("a[href]"):
-            href = a.get("href", "")
-            if "/site/column/" not in href and "/site/news/" not in href:
+        for item in results:
+            title = item.get("title", "")
+            if not title or len(title) < 5:
                 continue
-            title = a.get_text(strip=True)
-            if not title or len(title) < 5 or title in seen:
-                continue
-            seen.add(title)
-            if not href.startswith("http"):
-                href = f"https://www.4gamers.com.tw{href}"
+            published_at = ""
+            ts = item.get("createPublishedAt")
+            if ts:
+                published_at = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(ts / 1000))
             news.append({
                 "id": _news_hash(title, "4Gamers TW"),
                 "title": title,
-                "url": href,
-                "summary": "",
+                "url": item.get("canonicalUrl", ""),
+                "summary": (item.get("intro") or "")[:100],
                 "source": "4Gamers TW",
                 "source_icon": "🕹️",
-                "published_at": "",
+                "published_at": published_at,
                 "fetched_at": int(time.time()),
             })
-            if len(news) >= PER_SOURCE:
-                break
         return news
     except Exception as e:
         print(f"[News] 4Gamers TW error: {e}")
@@ -144,13 +139,19 @@ async def aggregate_news():
             seen_ids.add(item["id"])
             unique_news.append(item)
 
-    unique_news.sort(key=lambda x: x.get("fetched_at", 0), reverse=True)
+    unique_news.sort(key=lambda x: x.get("published_at") or "", reverse=True)
     unique_news = unique_news[:MAX_NEWS]
+
+    source_counts = {}
+    for item in unique_news:
+        src = item.get("source", "unknown")
+        source_counts[src] = source_counts.get(src, 0) + 1
 
     result = {
         "news": unique_news,
         "total_count": len(unique_news),
         "max_count": MAX_NEWS,
+        "source_counts": source_counts,
         "updated_at": int(time.time()),
     }
 

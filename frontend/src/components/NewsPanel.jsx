@@ -2,10 +2,19 @@ import { useState, useEffect } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 
+const TABS = [
+    { key: 'all', label: '全部', source: null },
+    { key: 'gnn', label: 'GNN', source: '巴哈姆特 GNN' },
+    { key: '4gamers', label: '4Gamers', source: '4Gamers TW' },
+    { key: 'udn', label: 'UDN', source: 'UDN 遊戲角落' },
+]
+
 export default function NewsPanel() {
     const [news, setNews] = useState([])
     const [loading, setLoading] = useState(true)
     const [totalCount, setTotalCount] = useState(0)
+    const [sourceCounts, setSourceCounts] = useState({})
+    const [activeTab, setActiveTab] = useState('all')
 
     const fetchData = async () => {
         try {
@@ -13,6 +22,7 @@ export default function NewsPanel() {
             const json = await resp.json()
             setNews(json.data?.news || [])
             setTotalCount(json.data?.total_count || 0)
+            setSourceCounts(json.data?.source_counts || {})
         } catch (err) {
             console.error('[News] Fetch error:', err)
         } finally {
@@ -25,6 +35,16 @@ export default function NewsPanel() {
         const timer = setInterval(fetchData, 10 * 60 * 1000)
         return () => clearInterval(timer)
     }, [])
+
+    const activeSource = TABS.find(t => t.key === activeTab)?.source
+    const filteredNews = activeSource
+        ? news.filter(item => item.source === activeSource)
+        : news
+
+    const getTabCount = (tab) => {
+        if (!tab.source) return totalCount
+        return sourceCounts[tab.source] || 0
+    }
 
     const getSourceClass = (source) => {
         if (source?.includes('GNN')) return 'news-item__source--gnn'
@@ -69,17 +89,29 @@ export default function NewsPanel() {
                     <span className="panel__title-icon">📰</span> 即時新聞
                 </div>
                 <span className="panel__badge panel__badge--count">
-                    {totalCount}/50
+                    {filteredNews.length}
                 </span>
             </div>
+            <div className="tab-switcher">
+                {TABS.map(tab => (
+                    <button
+                        key={tab.key}
+                        className={`tab-btn ${activeTab === tab.key ? 'tab-btn--active' : ''}`}
+                        onClick={() => setActiveTab(tab.key)}
+                    >
+                        {tab.label}
+                        <span className="news-tab__count">{getTabCount(tab)}</span>
+                    </button>
+                ))}
+            </div>
             <div className="panel__body">
-                {news.length === 0 ? (
+                {filteredNews.length === 0 ? (
                     <div className="empty-state">
                         <span className="empty-state__icon">📰</span>
                         <span>暫無新聞</span>
                     </div>
                 ) : (
-                    news.map((item, i) => (
+                    filteredNews.map((item, i) => (
                         <a
                             key={item.id || i}
                             href={item.url}

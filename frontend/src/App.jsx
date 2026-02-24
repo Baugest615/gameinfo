@@ -6,7 +6,7 @@ import TwitchPanel from './components/TwitchPanel'
 import DiscussionPanel from './components/DiscussionPanel'
 import NewsPanel from './components/NewsPanel'
 import MobilePanel from './components/MobilePanel'
-import GoogleTrendsPanel from './components/GoogleTrendsPanel'
+import WeeklyDigestPanel from './components/WeeklyDigestPanel'
 import TrendModal from './components/TrendModal'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
@@ -43,7 +43,7 @@ export default function App() {
                 <DiscussionPanel />
                 <NewsPanel />
                 <MobilePanel />
-                <GoogleTrendsPanel />
+                <WeeklyDigestPanel />
             </div>
             <TrendModal target={trendTarget} onClose={() => setTrendTarget(null)} />
         </div>

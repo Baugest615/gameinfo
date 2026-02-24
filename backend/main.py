@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 from fastapi import Query
-from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper, gtrends_scraper
+from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper, gtrends_scraper, weekly_digest_scraper
 from scheduler import start_scheduler, stop_scheduler
 import database
 import predictor
@@ -91,7 +91,7 @@ async def get_discussions():
 
 @app.get("/api/news", tags=["即時新聞"])
 async def get_news():
-    """聚合遊戲新聞（巴哈GNN + 4Gamer + UDN 遊戲角落），上限 50 條"""
+    """聚合遊戲新聞（巴哈GNN + 4Gamers + UDN 遊戲角落），上限 100 條"""
     data = await news_scraper.aggregate_news()
     return {"data": data, "source": "GNN/4Gamer/UDN"}
 
@@ -151,6 +151,17 @@ async def get_google_trends():
 
 
 # ============================================================
+# Phase 6 端點：每周遊戲行銷摘要
+# ============================================================
+
+@app.get("/api/weekly-digest", tags=["每周摘要"])
+async def get_weekly_digest():
+    """每周遊戲行銷摘要（廣告/活動/聯名），來源：Android 營收 Top 10 + 巴哈熱門版 Top 10"""
+    data = await weekly_digest_scraper.fetch_weekly_digest()
+    return {"data": data, "source": "4Gamers/YouTube"}
+
+
+# ============================================================
 # 系統端點
 # ============================================================
 
@@ -169,6 +180,7 @@ async def root():
             "mobile_ios": "/api/mobile/ios",
             "mobile_android": "/api/mobile/android",
             "google_trends": "/api/google-trends",
+            "weekly_digest": "/api/weekly-digest",
         }
     }
 

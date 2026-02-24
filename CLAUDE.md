@@ -1,7 +1,7 @@
 # GameInfo System — Claude 開發上下文
 
 ## 專案概述
-遊戲市場即時輿情追蹤系統。追蹤 Steam 熱門遊戲、Twitch 中文直播熱度、台灣遊戲新聞、討論聲量、手遊排行、Google Trends 遊戲/二次元熱搜，並提供歷史趨勢圖。
+遊戲市場即時輿情追蹤系統。追蹤 Steam 熱門遊戲、Twitch 中文直播熱度、台灣遊戲新聞、討論聲量、手遊排行、每周行銷摘要，並提供歷史趨勢圖。
 
 ## 架構
 
@@ -18,7 +18,8 @@ gameinfo-system/
 │   │   ├── news_scraper.py       # 台灣遊戲新聞（GNN RSS / 4Gamers TW / UDN）
 │   │   ├── discussion_scraper.py # 巴哈姆特 / PTT / 遊戲大亂鬥
 │   │   ├── mobile_scraper.py     # App Store / Google Play 手遊排行
-│   │   └── gtrends_scraper.py    # Google Trends 台灣遊戲/二次元熱搜
+│   │   ├── gtrends_scraper.py    # Google Trends（已停用排程，保留 API）
+│   │   └── weekly_digest_scraper.py # 每周行銷摘要（4Gamers/YouTube/巴哈板）
 │   ├── cache/        # JSON 快取（+ history.db SQLite）
 │   ├── requirements.txt
 │   └── .env          # 本地環境變數（不進 git）
@@ -32,7 +33,7 @@ gameinfo-system/
         │   ├── DiscussionPanel.jsx # 討論聲量
         │   ├── NewsPanel.jsx       # 即時新聞
         │   ├── MobilePanel.jsx        # 手遊排行
-        │   ├── GoogleTrendsPanel.jsx # Google Trends 熱搜（Phase 4）
+        │   ├── WeeklyDigestPanel.jsx # 每周行銷摘要（Phase 6）
         │   └── TrendModal.jsx        # 歷史趨勢圖 Modal（Phase 3）
 ```
 
@@ -49,6 +50,7 @@ gameinfo-system/
 ```
 TWITCH_CLIENT_ID=       # Twitch API 憑證
 TWITCH_CLIENT_SECRET=
+YOUTUBE_API_KEY=        # YouTube Data API v3（每周摘要用）
 FRONTEND_URL=           # Vercel 前端網址（CORS 白名單）
 ```
 
@@ -64,12 +66,13 @@ GET /api/steam/top-games          # Steam 全球熱門排行
 GET /api/steam/player-count/{id}  # 特定遊戲即時人數
 GET /api/twitch/top-games         # Twitch 中文直播排行
 GET /api/discussions              # 巴哈/PTT/遊戲大亂鬥討論聲量
-GET /api/news                     # 台灣遊戲新聞（最多 50 條）
+GET /api/news                     # 台灣遊戲新聞（最多 100 條，含來源分頁）
 GET /api/mobile/ios               # App Store 遊戲排行
 GET /api/mobile/android           # Google Play 遊戲排行
 GET /api/mobile/all               # iOS + Android 合併
 GET /api/history/{source}/{id}?days=&forecast=  # 歷史趨勢 + AI 預測（source: steam|twitch，days: 1-30，forecast: true|false）
-GET /api/google-trends               # Google Trends 台灣遊戲/二次元熱搜
+GET /api/google-trends               # Google Trends（保留但已停用排程）
+GET /api/weekly-digest               # 每周行銷摘要（廣告/活動/聯名）
 GET /api/health                      # 健康檢查
 ```
 
@@ -78,8 +81,9 @@ GET /api/health                      # 健康檢查
 ```
 Steam / 新聞：30 分鐘
 Twitch：15 分鐘
-巴哈/PTT 討論 / Google Trends：60 分鐘
+巴哈/PTT 討論：60 分鐘
 手遊排行：180 分鐘
+每周行銷摘要：每周一 06:00（cron）
 ```
 
 ## Phase 功能狀態
@@ -87,8 +91,9 @@ Twitch：15 分鐘
 - **Phase 1** ✅ Steam 熱門遊戲 / Twitch 直播 / 討論聲量
 - **Phase 2** ✅ 台灣即時新聞 / 手遊排行（iOS + Android）
 - **Phase 3** ✅ 歷史趨勢圖（Recharts LineChart）
-- **Phase 4** ✅ Google Trends 台灣遊戲/二次元熱搜（取代追蹤清單）
+- **Phase 4** ⏸️ Google Trends 台灣遊戲/二次元熱搜（非官方 API 不穩定，已停用排程）
 - **Phase 5** ✅ AI 熱度預測（加權線性回歸 + 日週期調整）
+- **Phase 6** ✅ 每周行銷摘要（Android 營收 Top 10 + 巴哈熱門版 Top 10，來源：4Gamers/YouTube/巴哈板）
 
 ## 已知限制
 
@@ -96,7 +101,9 @@ Twitch：15 分鐘
 - Twitch `language=zh` 涵蓋台灣/香港中文直播主，並非純台灣
 - Steam 無台灣地區 API，顯示全球排行
 - PTT 爬蟲可能因網路限制不穩定（Zeabur 亞洲節點較佳）
-- Google Trends 使用非官方 API，可能因 Google 反爬機制暫時失效（有 RSS fallback + 快取兜底）
+- Google Trends 使用非官方 API，已因不穩定停用排程（API endpoint 保留，檔案未刪除）
+- YouTube Data API 每日 10,000 單位配額（search.list = 100 單位/次），每周摘要約消耗 4,000 單位
+- 4Gamers tag 搜尋名稱匹配率約 10-20%，主要靠 YouTube + 巴哈板補足
 
 ## 開發慣例
 
