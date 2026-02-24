@@ -6,7 +6,6 @@
 """
 import feedparser
 import httpx
-from bs4 import BeautifulSoup
 import json
 import os
 import time
@@ -97,36 +96,35 @@ async def fetch_4gamers_tw():
 
 
 async def fetch_udn_game():
-    """UDN 遊戲角落"""
-    url = "https://game.udn.com/game/index"
+    """UDN 遊戲角落 RSS"""
+    url = "https://game.udn.com/game/rssfeed"
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             resp = await client.get(url, headers=HEADERS)
             resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
+        feed = feedparser.parse(resp.text)
         news = []
-        seen = set()
-
-        for a in soup.select("a[href]"):
-            href = a.get("href", "")
-            if "game.udn.com/game/story" not in href:
+        for entry in feed.entries[:PER_SOURCE]:
+            title = entry.get("title", "")
+            if not title or len(title) < 5:
                 continue
-            title = a.get_text(strip=True)
-            if not title or len(title) < 5 or title in seen:
-                continue
-            seen.add(title)
+            pub_raw = entry.get("published", "")
+            pub_iso = ""
+            if pub_raw:
+                try:
+                    pub_iso = parsedate_to_datetime(pub_raw).strftime("%Y-%m-%dT%H:%M:%S")
+                except Exception:
+                    pub_iso = pub_raw
             news.append({
                 "id": _news_hash(title, "UDN"),
                 "title": title,
-                "url": href,
-                "summary": "",
+                "url": entry.get("link", ""),
+                "summary": (entry.get("summary", "") or "")[:100],
                 "source": "UDN 遊戲角落",
                 "source_icon": "📰",
-                "published_at": "",
+                "published_at": pub_iso,
                 "fetched_at": int(time.time()),
             })
-            if len(news) >= PER_SOURCE:
-                break
         return news
     except Exception as e:
         print(f"[News] UDN error: {e}")
