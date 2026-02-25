@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 from fastapi import Query
-from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper, gtrends_scraper, weekly_digest_scraper
+from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper, weekly_digest_scraper
 from scheduler import start_scheduler, stop_scheduler
 import database
 import predictor
@@ -48,8 +48,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -139,16 +139,6 @@ async def get_history(
     return {"data": data, "forecast": forecast_data, "game_id": game_id, "source": source}
 
 
-# ============================================================
-# Phase 4 端點：Google Trends 熱搜
-# ============================================================
-
-@app.get("/api/google-trends", tags=["Google Trends"])
-async def get_google_trends():
-    """Google Trends 台灣遊戲/二次元熱搜"""
-    data = await gtrends_scraper.fetch_google_trends()
-    return {"data": data, "source": "Google Trends TW"}
-
 
 # ============================================================
 # Phase 6 端點：每周遊戲行銷摘要
@@ -186,7 +176,6 @@ async def root():
             "news": "/api/news",
             "mobile_ios": "/api/mobile/ios",
             "mobile_android": "/api/mobile/android",
-            "google_trends": "/api/google-trends",
             "weekly_digest": "/api/weekly-digest",
         }
     }

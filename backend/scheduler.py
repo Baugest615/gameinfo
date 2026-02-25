@@ -15,13 +15,9 @@ scheduler = BackgroundScheduler()
 
 
 def _run_async(coro):
-    """在背景執行緒中執行 async 函式"""
+    """在背景執行緒中執行 async 函式（使用 asyncio.run 自動管理 event loop）"""
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(coro)
-        loop.close()
-        return result
+        return asyncio.run(coro)
     except Exception as e:
         print(f"[Scheduler] Error: {e}")
         return None

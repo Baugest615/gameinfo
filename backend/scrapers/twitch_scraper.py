@@ -2,6 +2,7 @@
 Twitch 即時串流數據模組
 - 中文語言 (language=zh) 熱門遊戲排行（涵蓋台灣/香港直播主）
 """
+import asyncio
 import httpx
 import json
 import os
@@ -18,36 +19,38 @@ def _get_client_secret():
     return os.getenv("TWITCH_CLIENT_SECRET", "")
 
 _token_cache = {"access_token": None, "expires_at": 0}
+_token_lock = asyncio.Lock()
 
 
 async def _get_access_token():
-    """使用 Client Credentials Flow 取得 Twitch OAuth Token"""
+    """使用 Client Credentials Flow 取得 Twitch OAuth Token（async lock 防止並發重複刷新）"""
     global _token_cache
 
-    if _token_cache["access_token"] and time.time() < _token_cache["expires_at"]:
-        return _token_cache["access_token"]
+    async with _token_lock:
+        if _token_cache["access_token"] and time.time() < _token_cache["expires_at"]:
+            return _token_cache["access_token"]
 
-    if not _get_client_id() or not _get_client_secret():
-        print("[Twitch] Missing TWITCH_CLIENT_ID or TWITCH_CLIENT_SECRET")
-        return None
+        if not _get_client_id() or not _get_client_secret():
+            print("[Twitch] Missing TWITCH_CLIENT_ID or TWITCH_CLIENT_SECRET")
+            return None
 
-    url = "https://id.twitch.tv/oauth2/token"
-    params = {
-        "client_id": _get_client_id(),
-        "client_secret": _get_client_secret(),
-        "grant_type": "client_credentials"
-    }
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(url, params=params)
-            resp.raise_for_status()
-            data = resp.json()
-            _token_cache["access_token"] = data["access_token"]
-            _token_cache["expires_at"] = time.time() + data.get("expires_in", 3600) - 60
-            return data["access_token"]
-    except Exception as e:
-        print(f"[Twitch] Error getting access token: {e}")
-        return None
+        url = "https://id.twitch.tv/oauth2/token"
+        params = {
+            "client_id": _get_client_id(),
+            "client_secret": _get_client_secret(),
+            "grant_type": "client_credentials"
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(url, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                _token_cache["access_token"] = data["access_token"]
+                _token_cache["expires_at"] = time.time() + data.get("expires_in", 3600) - 60
+                return data["access_token"]
+        except Exception as e:
+            print(f"[Twitch] Error getting access token: {e}")
+            return None
 
 
 async def fetch_top_games(limit=20):

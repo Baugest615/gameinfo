@@ -118,9 +118,13 @@ def _format_gp_results(raw_results, chart_label, count=30):
 async def fetch_android_top_games(count=30):
     """Google Play 台灣區遊戲排行 — 使用 gplay-scraper 套件"""
     try:
-        # gplay-scraper 是同步套件，用 asyncio.to_thread 避免阻塞
-        free_raw = await asyncio.to_thread(_fetch_gp_chart, "TOP_FREE", count)
-        grossing_raw = await asyncio.to_thread(_fetch_gp_chart, "TOP_GROSSING", count)
+        # gplay-scraper 是同步套件，用 asyncio.to_thread 避免阻塞，加逾時防止掛起
+        free_raw = await asyncio.wait_for(
+            asyncio.to_thread(_fetch_gp_chart, "TOP_FREE", count), timeout=60
+        )
+        grossing_raw = await asyncio.wait_for(
+            asyncio.to_thread(_fetch_gp_chart, "TOP_GROSSING", count), timeout=60
+        )
 
         results = {
             "free": _format_gp_results(free_raw, "Android Free", count),
