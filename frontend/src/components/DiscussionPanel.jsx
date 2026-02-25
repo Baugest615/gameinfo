@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 const TABS = [
     { key: 'bahamut_boards', label: '巴哈熱門版' },
@@ -10,6 +11,7 @@ const TABS = [
 export default function DiscussionPanel() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('bahamut_boards');
     const [sentimentSummary, setSentimentSummary] = useState(null);
 
@@ -22,14 +24,18 @@ export default function DiscussionPanel() {
     };
 
     useEffect(() => {
-        fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api/discussions`)
+        fetch(`${API_BASE}/api/discussions`)
             .then(r => r.json())
             .then(d => {
                 setData(d.data);
                 setSentimentSummary(d.data?.sentiment_summary || null);
+                setError(null);
                 setLoading(false);
             })
-            .catch(() => setLoading(false));
+            .catch(() => {
+                setError('討論數據載入失敗');
+                setLoading(false);
+            });
     }, []);
 
     const currentItems = data ? (data[activeTab] || []) : [];
@@ -68,6 +74,11 @@ export default function DiscussionPanel() {
                     <div className="loading-state">
                         <div className="loading-spinner" />
                         <span>載入討論數據中...</span>
+                    </div>
+                ) : error ? (
+                    <div className="empty-state">
+                        <span className="empty-state__icon">&#x26A0;&#xFE0F;</span>
+                        <span>{error}</span>
                     </div>
                 ) : currentItems.length === 0 ? (
                     <div className="empty-state">

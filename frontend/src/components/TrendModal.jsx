@@ -3,8 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer
 } from 'recharts'
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+import { API_BASE } from '../config'
 
 function formatTime(ts) {
   const d = new Date(ts * 1000)
@@ -26,18 +25,34 @@ export default function TrendModal({ target, onClose }) {
   const [data, setData] = useState([])
   const [forecast, setForecast] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [showForecast, setShowForecast] = useState(false)
+
+  // ESC 鍵關閉 Modal
+  useEffect(() => {
+    if (!target) return
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [target, onClose])
 
   useEffect(() => {
     if (!target) return
     setLoading(true)
+    setError(null)
     fetch(`${API_BASE}/api/history/${target.source}/${target.id}?days=${days}&forecast=true`)
       .then((r) => r.json())
       .then((json) => {
         setData(json.data || [])
         setForecast(json.forecast || [])
       })
-      .catch(() => { setData([]); setForecast([]) })
+      .catch(() => {
+        setData([])
+        setForecast([])
+        setError('趨勢資料載入失敗')
+      })
       .finally(() => setLoading(false))
   }, [target, days])
 
@@ -102,6 +117,11 @@ export default function TrendModal({ target, onClose }) {
             <div className="loading-state">
               <div className="loading-spinner" />
               <span>載入中...</span>
+            </div>
+          ) : error ? (
+            <div className="empty-state">
+              <span className="empty-state__icon">&#x26A0;&#xFE0F;</span>
+              <span>{error}</span>
             </div>
           ) : chartData.length < 2 ? (
             <div className="empty-state">

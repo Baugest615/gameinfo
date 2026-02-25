@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 const TABS = [
     { key: 'ios_free', label: 'iOS 免費' },
@@ -10,19 +11,24 @@ export default function MobilePanel() {
     const [iosData, setIosData] = useState(null);
     const [androidData, setAndroidData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('ios_free');
 
     useEffect(() => {
         Promise.all([
-            fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api/mobile/ios`).then(r => r.json()),
-            fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api/mobile/android`).then(r => r.json()),
+            fetch(`${API_BASE}/api/mobile/ios`).then(r => r.json()),
+            fetch(`${API_BASE}/api/mobile/android`).then(r => r.json()),
         ])
             .then(([ios, android]) => {
                 setIosData(ios.data);
                 setAndroidData(android.data);
+                setError(null);
                 setLoading(false);
             })
-            .catch(() => setLoading(false));
+            .catch(() => {
+                setError('手遊排行載入失敗');
+                setLoading(false);
+            });
     }, []);
 
     const getItems = () => {
@@ -61,6 +67,11 @@ export default function MobilePanel() {
                     <div className="loading-state">
                         <div className="loading-spinner" />
                         <span>載入排行數據中...</span>
+                    </div>
+                ) : error ? (
+                    <div className="empty-state">
+                        <span className="empty-state__icon">&#x26A0;&#xFE0F;</span>
+                        <span>{error}</span>
                     </div>
                 ) : items.length === 0 ? (
                     <div className="empty-state">

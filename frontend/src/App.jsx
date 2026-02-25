@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './index.css'
+import { API_BASE } from './config'
 import Header from './components/Header'
 import SteamPanel from './components/SteamPanel'
 import TwitchPanel from './components/TwitchPanel'
@@ -8,8 +9,6 @@ import NewsPanel from './components/NewsPanel'
 import MobilePanel from './components/MobilePanel'
 import WeeklyDigestPanel from './components/WeeklyDigestPanel'
 import TrendModal from './components/TrendModal'
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 
 export default function App() {
     const [steamData, setSteamData] = useState([])

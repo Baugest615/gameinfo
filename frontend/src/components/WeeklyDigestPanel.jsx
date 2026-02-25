@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+import { API_BASE } from '../config'
 
 const TAG_LABELS = {
     ad: { icon: '📢', label: '廣告' },
@@ -19,6 +18,7 @@ const FILTER_TABS = [
 export default function WeeklyDigestPanel() {
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
     const [activeFilter, setActiveFilter] = useState('all')
     const [expandedGame, setExpandedGame] = useState(null)
 
@@ -28,8 +28,10 @@ export default function WeeklyDigestPanel() {
                 const resp = await fetch(`${API_BASE}/api/weekly-digest`)
                 const json = await resp.json()
                 setData(json.data || null)
+                setError(null)
             } catch (err) {
                 console.error('[WeeklyDigest] Fetch error:', err)
+                if (!data) setError('摘要載入失敗')
             } finally {
                 setLoading(false)
             }
@@ -102,7 +104,12 @@ export default function WeeklyDigestPanel() {
                 ))}
             </div>
             <div className="panel__body">
-                {filteredDigest.length === 0 ? (
+                {error ? (
+                    <div className="empty-state">
+                        <span className="empty-state__icon">&#x26A0;&#xFE0F;</span>
+                        <span>{error}</span>
+                    </div>
+                ) : filteredDigest.length === 0 ? (
                     <div className="empty-state">
                         <span className="empty-state__icon">📋</span>
                         <span>本周尚無行銷摘要</span>

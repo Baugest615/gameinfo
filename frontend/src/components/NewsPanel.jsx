@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+import { API_BASE } from '../config'
 
 const TABS = [
     { key: 'all', label: '全部', source: null },
@@ -12,6 +11,7 @@ const TABS = [
 export default function NewsPanel() {
     const [news, setNews] = useState([])
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
     const [totalCount, setTotalCount] = useState(0)
     const [sourceCounts, setSourceCounts] = useState({})
     const [activeTab, setActiveTab] = useState('all')
@@ -23,8 +23,10 @@ export default function NewsPanel() {
             setNews(json.data?.news || [])
             setTotalCount(json.data?.total_count || 0)
             setSourceCounts(json.data?.source_counts || {})
+            setError(null)
         } catch (err) {
             console.error('[News] Fetch error:', err)
+            if (news.length === 0) setError('新聞載入失敗')
         } finally {
             setLoading(false)
         }
@@ -105,7 +107,12 @@ export default function NewsPanel() {
                 ))}
             </div>
             <div className="panel__body">
-                {filteredNews.length === 0 ? (
+                {error ? (
+                    <div className="empty-state">
+                        <span className="empty-state__icon">&#x26A0;&#xFE0F;</span>
+                        <span>{error}</span>
+                    </div>
+                ) : filteredNews.length === 0 ? (
                     <div className="empty-state">
                         <span className="empty-state__icon">📰</span>
                         <span>暫無新聞</span>

@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
-
 export default function Header({ steamData }) {
   const [time, setTime] = useState('')
   const trackRef = useRef(null)

@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react'
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+import { API_BASE } from '../config'
 
 export default function SteamPanel({ onTrendClick }) {
     const [games, setGames] = useState([])
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
 
     const fetchData = async () => {
         try {
             const resp = await fetch(`${API_BASE}/api/steam/top-games`)
             const json = await resp.json()
             setGames(json.data || [])
+            setError(null)
         } catch (err) {
             console.error('[Steam] Fetch error:', err)
+            if (games.length === 0) setError('Steam 資料載入失敗')
         } finally {
             setLoading(false)
         }
@@ -49,7 +51,12 @@ export default function SteamPanel({ onTrendClick }) {
                 <span className="panel__badge panel__badge--live">● LIVE</span>
             </div>
             <div className="panel__body">
-                {games.length === 0 ? (
+                {error ? (
+                    <div className="empty-state">
+                        <span className="empty-state__icon">&#x26A0;&#xFE0F;</span>
+                        <span>{error}</span>
+                    </div>
+                ) : games.length === 0 ? (
                     <div className="empty-state">
                         <span className="empty-state__icon">🎮</span>
                         <span>暫無資料</span>
