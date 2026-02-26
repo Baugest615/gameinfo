@@ -7,6 +7,7 @@ APScheduler 定時排程
 - 每周行銷摘要：每周一 06:00
 """
 import asyncio
+from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper, weekly_digest_scraper
 import database
@@ -14,10 +15,13 @@ import database
 scheduler = BackgroundScheduler()
 
 
-def _run_async(coro):
-    """在背景執行緒中執行 async 函式（使用 asyncio.run 自動管理 event loop）"""
+def _run_async(coro, timeout=120):
+    """在背景執行緒中執行 async 函式，加整體 timeout 保護"""
     try:
-        return asyncio.run(coro)
+        return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
+    except asyncio.TimeoutError:
+        print(f"[Scheduler] Timeout after {timeout}s")
+        return None
     except Exception as e:
         print(f"[Scheduler] Error: {e}")
         return None
@@ -46,27 +50,27 @@ async def _update_twitch_async():
 
 def update_steam():
     print("[Scheduler] Updating Steam data...")
-    _run_async(_update_steam_async())
+    _run_async(_update_steam_async(), timeout=60)
 
 
 def update_twitch():
     print("[Scheduler] Updating Twitch data...")
-    _run_async(_update_twitch_async())
+    _run_async(_update_twitch_async(), timeout=45)
 
 
 def update_discussions():
     print("[Scheduler] Updating discussions...")
-    _run_async(discussion_scraper.fetch_all_discussions())
+    _run_async(discussion_scraper.fetch_all_discussions(), timeout=90)
 
 
 def update_news():
     print("[Scheduler] Updating news...")
-    _run_async(news_scraper.aggregate_news())
+    _run_async(news_scraper.aggregate_news(), timeout=60)
 
 
 def update_mobile():
     print("[Scheduler] Updating mobile rankings...")
-    _run_async(mobile_scraper.fetch_all_mobile())
+    _run_async(mobile_scraper.fetch_all_mobile(), timeout=120)
 
 
 def update_weekly_digest():
@@ -94,17 +98,26 @@ def _init_weekly_digest():
 
 
 def start_scheduler():
-    """啟動定時排程"""
-    scheduler.add_job(update_steam, "interval", minutes=30, id="steam", replace_existing=True)
-    scheduler.add_job(update_twitch, "interval", minutes=15, id="twitch", replace_existing=True)
-    scheduler.add_job(update_discussions, "interval", minutes=60, id="discussions", replace_existing=True)
-    scheduler.add_job(update_news, "interval", minutes=30, id="news", replace_existing=True)
-    scheduler.add_job(update_mobile, "interval", minutes=180, id="mobile", replace_existing=True)
-    scheduler.add_job(update_weekly_digest, "cron", day_of_week="mon", hour=6, minute=0, id="weekly_digest", replace_existing=True)
+    """啟動定時排程（錯開首次執行，避免同時搶資源）"""
+    now = datetime.now()
+
+    # 錯開啟動：輕量 job 先跑，重量 job 延後
+    scheduler.add_job(update_steam, "interval", minutes=30, id="steam",
+                      next_run_time=now + timedelta(seconds=10), replace_existing=True)
+    scheduler.add_job(update_twitch, "interval", minutes=15, id="twitch",
+                      next_run_time=now + timedelta(minutes=2), replace_existing=True)
+    scheduler.add_job(update_news, "interval", minutes=30, id="news",
+                      next_run_time=now + timedelta(minutes=4), replace_existing=True)
+    scheduler.add_job(update_discussions, "interval", minutes=60, id="discussions",
+                      next_run_time=now + timedelta(minutes=6), replace_existing=True)
+    scheduler.add_job(update_mobile, "interval", minutes=180, id="mobile",
+                      next_run_time=now + timedelta(minutes=10), replace_existing=True)
+    scheduler.add_job(update_weekly_digest, "cron", day_of_week="mon", hour=6, minute=0,
+                      id="weekly_digest", replace_existing=True)
 
     scheduler.start()
 
-    # 首次啟動：若 weekly digest 快取不存在或為空，排程初始化
+    # 首次啟動：若 weekly digest 快取不存在或為空，排程初始化（延後到其他 job 之後）
     import os, json
     cache_file = os.path.join(os.path.dirname(__file__), "cache", "weekly_digest.json")
     need_init = not os.path.exists(cache_file)
@@ -117,10 +130,11 @@ def start_scheduler():
         except Exception:
             need_init = True
     if need_init:
-        scheduler.add_job(_init_weekly_digest, id="weekly_digest_init", replace_existing=True)
-        print("[Scheduler] Weekly digest init queued (will fetch dependencies first)")
+        scheduler.add_job(_init_weekly_digest, id="weekly_digest_init",
+                          next_run_time=now + timedelta(minutes=15), replace_existing=True)
+        print("[Scheduler] Weekly digest init queued (will run after 15min)")
 
-    print("[Scheduler] Started - Steam/News: 30min, Twitch: 15min, Discussions: 60min, Mobile: 180min, WeeklyDigest: Mon 06:00")
+    print("[Scheduler] Started - Steam:10s, Twitch:2min, News:4min, Discussions:6min, Mobile:10min")
 
 
 def stop_scheduler():

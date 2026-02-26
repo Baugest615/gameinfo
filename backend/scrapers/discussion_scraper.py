@@ -5,6 +5,7 @@ Tab 2: PTT 全站即時人氣熱門版 (hotboards)
 Tab 3: 巴哈姆特每版當天最熱文章 (含來源版名)
 Tab 4: PTT 遊戲版推文數最多文章
 """
+import asyncio
 import httpx
 from bs4 import BeautifulSoup
 import json
@@ -218,61 +219,71 @@ async def fetch_bahamut_hot_articles():
 # Tab 4: PTT 推文數最多文章
 # ============================================================
 async def fetch_ptt_hot_articles():
-    """PTT 遊戲版中推文數最多的文章"""
+    """PTT 遊戲版中推文數最多的文章（5 版面並行爬取）"""
     boards = ["C_Chat", "Steam", "PlayStation", "NSwitch", "LoL"]
-    all_articles = []
 
-    async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+    async def _fetch_one_board(client, board):
+        url = f"https://www.ptt.cc/bbs/{board}/index.html"
         cookies = {"over18": "1"}
-        for board in boards:
-            url = f"https://www.ptt.cc/bbs/{board}/index.html"
-            try:
-                resp = await client.get(url, headers=HEADERS, cookies=cookies)
-                if resp.status_code != 200:
+        articles = []
+        try:
+            resp = await client.get(url, headers=HEADERS, cookies=cookies)
+            if resp.status_code != 200:
+                return articles
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            for item in soup.select("div.r-ent"):
+                title_el = item.select_one("div.title a")
+                nrec_el = item.select_one("div.nrec span")
+
+                if not title_el:
                     continue
 
-                soup = BeautifulSoup(resp.text, "html.parser")
+                title = title_el.get_text(strip=True)
 
-                for item in soup.select("div.r-ent"):
-                    title_el = item.select_one("div.title a")
-                    nrec_el = item.select_one("div.nrec span")
+                skip_prefixes = ["[公告]", "Fw: [公告]", "[版規]", "[置底]", "[活動]"]
+                if any(title.startswith(p) for p in skip_prefixes):
+                    continue
+                if "(本文已被刪除)" in title:
+                    continue
 
-                    if not title_el:
-                        continue
+                href = title_el.get("href", "")
+                pop_text = nrec_el.get_text(strip=True) if nrec_el else "0"
 
-                    title = title_el.get_text(strip=True)
+                if pop_text == "\u7206":
+                    pop_value = 100
+                elif pop_text.startswith("X"):
+                    pop_value = -1
+                elif pop_text.isdigit():
+                    pop_value = int(pop_text)
+                else:
+                    pop_value = 0
 
-                    # 排除公告/置底文
-                    skip_prefixes = ["[公告]", "Fw: [公告]", "[版規]", "[置底]", "[活動]"]
-                    if any(title.startswith(p) for p in skip_prefixes):
-                        continue
-                    if "(本文已被刪除)" in title:
-                        continue
+                if href:
+                    href = f"https://www.ptt.cc{href}"
 
-                    href = title_el.get("href", "")
-                    pop_text = nrec_el.get_text(strip=True) if nrec_el else "0"
+                articles.append({
+                    "title": title,
+                    "url": href,
+                    "source": f"PTT {board}",
+                    "popularity": pop_text,
+                    "popularity_value": pop_value,
+                })
+        except Exception:
+            pass
+        return articles
 
-                    if pop_text == "\u7206":
-                        pop_value = 100
-                    elif pop_text.startswith("X"):
-                        pop_value = -1
-                    elif pop_text.isdigit():
-                        pop_value = int(pop_text)
-                    else:
-                        pop_value = 0
+    async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+        results = await asyncio.gather(
+            *[_fetch_one_board(client, board) for board in boards],
+            return_exceptions=True,
+        )
 
-                    if href:
-                        href = f"https://www.ptt.cc{href}"
-
-                    all_articles.append({
-                        "title": title,
-                        "url": href,
-                        "source": f"PTT {board}",
-                        "popularity": pop_text,
-                        "popularity_value": pop_value,
-                    })
-            except Exception:
-                continue
+    all_articles = []
+    for r in results:
+        if isinstance(r, list):
+            all_articles.extend(r)
 
     all_articles.sort(key=lambda x: x["popularity_value"], reverse=True)
     return all_articles[:20]
@@ -282,12 +293,33 @@ async def fetch_ptt_hot_articles():
 # 聚合所有數據
 # ============================================================
 async def fetch_all_discussions():
-    """聚合四個分頁的討論數據"""
+    """聚合四個分頁的討論數據（兩批並行：boards → articles）"""
     try:
-        bahamut_boards = await fetch_bahamut_top_boards()
-        ptt_boards = await fetch_ptt_hot_boards()
-        bahamut_articles = await fetch_bahamut_hot_articles()
-        ptt_articles = await fetch_ptt_hot_articles()
+        # 第一批：巴哈 boards + PTT boards（不同主機，可並行）
+        bahamut_boards, ptt_boards = await asyncio.gather(
+            fetch_bahamut_top_boards(),
+            fetch_ptt_hot_boards(),
+            return_exceptions=True,
+        )
+        if isinstance(bahamut_boards, Exception):
+            print(f"[Discussion] Bahamut boards error: {bahamut_boards}")
+            bahamut_boards = []
+        if isinstance(ptt_boards, Exception):
+            print(f"[Discussion] PTT boards error: {ptt_boards}")
+            ptt_boards = []
+
+        # 第二批：巴哈 articles + PTT articles（不同主機，可並行）
+        bahamut_articles, ptt_articles = await asyncio.gather(
+            fetch_bahamut_hot_articles(),
+            fetch_ptt_hot_articles(),
+            return_exceptions=True,
+        )
+        if isinstance(bahamut_articles, Exception):
+            print(f"[Discussion] Bahamut articles error: {bahamut_articles}")
+            bahamut_articles = []
+        if isinstance(ptt_articles, Exception):
+            print(f"[Discussion] PTT articles error: {ptt_articles}")
+            ptt_articles = []
 
         # 情緒分析：巴哈用關鍵字，PTT 用推噓比 + 關鍵字
         for item in bahamut_articles:

@@ -120,10 +120,10 @@ async def fetch_android_top_games(count=30):
     try:
         # gplay-scraper 是同步套件，用 asyncio.to_thread 避免阻塞，加逾時防止掛起
         free_raw = await asyncio.wait_for(
-            asyncio.to_thread(_fetch_gp_chart, "TOP_FREE", count), timeout=60
+            asyncio.to_thread(_fetch_gp_chart, "TOP_FREE", count), timeout=30
         )
         grossing_raw = await asyncio.wait_for(
-            asyncio.to_thread(_fetch_gp_chart, "TOP_GROSSING", count), timeout=60
+            asyncio.to_thread(_fetch_gp_chart, "TOP_GROSSING", count), timeout=30
         )
 
         results = {
@@ -142,20 +142,31 @@ async def fetch_android_top_games(count=30):
 
 
 async def fetch_all_mobile():
-    """取得所有手遊排行數據"""
+    """取得所有手遊排行數據（iOS/Android 並行）"""
     try:
-        ios_free = await fetch_ios_top_free()
-        ios_grossing = await fetch_ios_top_grossing()
-        android_data = await fetch_android_top_games()
+        ios_free, android_data = await asyncio.gather(
+            fetch_ios_top_free(),
+            fetch_android_top_games(),
+            return_exceptions=True,
+        )
+
+        if isinstance(ios_free, Exception):
+            print(f"[Mobile] iOS free gather error: {ios_free}")
+            ios_free = []
+        if isinstance(android_data, Exception):
+            print(f"[Mobile] Android gather error: {android_data}")
+            android_data = _load_cache().get("android", {"free": [], "grossing": []})
+
+        ios_grossing = await fetch_ios_top_grossing()  # 直接回傳空列表
 
         result = {
             "ios": {
-                "free": ios_free,
+                "free": ios_free if isinstance(ios_free, list) else [],
                 "grossing": ios_grossing,
             },
             "android": {
-                "free": android_data.get("free", []),
-                "grossing": android_data.get("grossing", []),
+                "free": android_data.get("free", []) if isinstance(android_data, dict) else [],
+                "grossing": android_data.get("grossing", []) if isinstance(android_data, dict) else [],
             },
             "updated_at": int(time.time()),
         }

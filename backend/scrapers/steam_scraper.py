@@ -3,6 +3,7 @@ Steam 即時數據爬取模組
 - 熱門遊戲排行 (免 API Key)
 - 同時在線人數
 """
+import asyncio
 import httpx
 import json
 import os
@@ -61,28 +62,42 @@ async def fetch_player_count(appid: int):
 
 
 async def _batch_get_app_names(app_ids: list):
-    """批次取得遊戲名稱（使用 Steam Store API）"""
+    """批次取得遊戲名稱（並行查詢 + semaphore 限流）"""
     names = {}
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
-            # Steam Store API 一次最多查一個，但我們用快取加速
-            cached = _load_name_cache()
-            to_fetch = [aid for aid in app_ids if aid not in cached]
+        cached = _load_name_cache()
+        to_fetch = [aid for aid in app_ids if aid not in cached]
 
-            for aid in to_fetch:
-                try:
-                    url = f"https://store.steampowered.com/api/appdetails?appids={aid}&l=tchinese"
-                    resp = await client.get(url)
-                    if resp.status_code == 200:
-                        d = resp.json()
-                        app_data = d.get(str(aid), {})
-                        if app_data.get("success"):
-                            cached[aid] = app_data["data"]["name"]
-                except Exception:
-                    pass
+        if to_fetch:
+            sem = asyncio.Semaphore(5)
+
+            async def _fetch_one(client, aid):
+                async with sem:
+                    try:
+                        url = f"https://store.steampowered.com/api/appdetails?appids={aid}&l=tchinese"
+                        resp = await client.get(url)
+                        if resp.status_code == 200:
+                            d = resp.json()
+                            app_data = d.get(str(aid), {})
+                            if app_data.get("success"):
+                                return (aid, app_data["data"]["name"])
+                    except Exception:
+                        pass
+                    return (aid, None)
+
+            async with httpx.AsyncClient(timeout=10) as client:
+                results = await asyncio.gather(
+                    *[_fetch_one(client, aid) for aid in to_fetch],
+                    return_exceptions=True,
+                )
+
+            for r in results:
+                if isinstance(r, tuple) and r[1] is not None:
+                    cached[r[0]] = r[1]
 
             _save_name_cache(cached)
-            names = {aid: cached.get(aid, f"App {aid}") for aid in app_ids}
+
+        names = {aid: cached.get(aid, f"App {aid}") for aid in app_ids}
 
     except Exception as e:
         print(f"[Steam] Error batch fetching names: {e}")

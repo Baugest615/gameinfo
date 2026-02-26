@@ -4,6 +4,7 @@
 - 4Gamers TW 網頁爬蟲
 - UDN 遊戲角落 網頁爬蟲
 """
+import asyncio
 import feedparser
 import httpx
 import json
@@ -132,12 +133,21 @@ async def fetch_udn_game():
 
 
 async def aggregate_news():
-    """聚合所有新聞來源"""
-    gnn = await fetch_gnn_rss()
-    four_gamers = await fetch_4gamers_tw()
-    udn = await fetch_udn_game()
+    """聚合所有新聞來源（三來源並行）"""
+    results = await asyncio.gather(
+        fetch_gnn_rss(),
+        fetch_4gamers_tw(),
+        fetch_udn_game(),
+        return_exceptions=True,
+    )
 
-    all_news = gnn + four_gamers + udn
+    all_news = []
+    source_names = ["GNN", "4Gamers", "UDN"]
+    for i, r in enumerate(results):
+        if isinstance(r, Exception):
+            print(f"[News] {source_names[i]} gather error: {r}")
+        elif isinstance(r, list):
+            all_news.extend(r)
 
     seen_ids = set()
     unique_news = []
