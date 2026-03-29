@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react'
-import './index.css'
+import { useState, useEffect, useCallback } from 'react'
 import { API_BASE } from './config'
 import Header from './components/Header'
 import SteamPanel from './components/SteamPanel'
@@ -16,12 +15,14 @@ export default function App() {
     const handleTrendClick = (id, name, source) => {
         setTrendTarget({ id, name, source })
     }
+    const handleTrendClose = useCallback(() => setTrendTarget(null), [])
 
-    // 取得 Steam 資料供 Header ticker 使用
+    // 取得 Steam 資料供 Header ticker + SteamPanel 共用
     useEffect(() => {
         const fetchSteam = async () => {
             try {
                 const resp = await fetch(`${API_BASE}/api/steam/top-games`)
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
                 const json = await resp.json()
                 setSteamData(json.data || [])
             } catch (err) {
@@ -37,14 +38,14 @@ export default function App() {
         <div className="app">
             <Header steamData={steamData} />
             <div className="main-grid">
-                <SteamPanel onTrendClick={handleTrendClick} />
+                <SteamPanel steamData={steamData} onTrendClick={handleTrendClick} />
                 <TwitchPanel onTrendClick={handleTrendClick} />
                 <DiscussionPanel />
                 <NewsPanel />
                 <MobilePanel />
                 <WeeklyDigestPanel />
             </div>
-            <TrendModal target={trendTarget} onClose={() => setTrendTarget(null)} />
+            <TrendModal target={trendTarget} onClose={handleTrendClose} />
         </div>
     )
 }

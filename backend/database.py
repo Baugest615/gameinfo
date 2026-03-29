@@ -27,23 +27,31 @@ async def init_db():
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_source_game ON history (source, game_id)"
         )
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_recorded_at ON history (recorded_at)"
+        )
         await db.commit()
     print(f"[DB] Initialized history.db at {DB_PATH}")
 
 
 async def save_snapshot(source: str, game_id: str, game_name: str, value: int):
-    """寫入一筆快照，並清除超過 90 天的舊資料"""
+    """寫入一筆快照"""
     now = int(time.time())
-    cutoff = now - KEEP_DAYS * 86400
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(
             "INSERT INTO history (source, game_id, game_name, value, recorded_at) VALUES (?, ?, ?, ?, ?)",
             (source, str(game_id), game_name, value, now),
         )
-        await db.execute(
-            "DELETE FROM history WHERE recorded_at < ?", (cutoff,)
-        )
         await db.commit()
+
+
+async def cleanup_old_data():
+    """清除超過 90 天的舊資料（應每日執行一次）"""
+    cutoff = int(time.time()) - KEEP_DAYS * 86400
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("DELETE FROM history WHERE recorded_at < ?", (cutoff,))
+        await db.commit()
+    print("[DB] Cleaned up old snapshots")
 
 
 async def get_history(source: str, game_id: str, days: int = 7):

@@ -40,6 +40,7 @@ _origins = [
     "http://localhost:5173",
     "http://localhost:3000",
     "https://gameinfo-drab.vercel.app",
+    "https://gameinfo-backend-production.up.railway.app",
 ]
 if _frontend_url and _frontend_url not in _origins:
     _origins.append(_frontend_url)
@@ -49,7 +50,7 @@ app.add_middleware(
     allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["*"],
 )
 
 

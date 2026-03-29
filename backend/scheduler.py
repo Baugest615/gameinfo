@@ -1,100 +1,110 @@
 """
-APScheduler 定時排程
+APScheduler 定時排程（AsyncIOScheduler）
+共用 FastAPI 的事件循環，避免多執行緒 + asyncio.run() 的問題
 - Steam / 新聞：每 30 分鐘
 - Twitch：每 15 分鐘
 - 巴哈/PTT 討論：每 60 分鐘
 - 手遊排行：每 180 分鐘
 - 每周行銷摘要：每周一 06:00
+- DB 清理：每日 03:00
 """
 import asyncio
 from datetime import datetime, timedelta
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper, weekly_digest_scraper
 import database
 
-scheduler = BackgroundScheduler()
+scheduler = AsyncIOScheduler()
 
 
-def _run_async(coro, timeout=120):
-    """在背景執行緒中執行 async 函式，加整體 timeout 保護"""
+async def _run_with_timeout(coro, timeout, label):
+    """執行 async 任務，加 timeout 保護"""
     try:
-        return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
+        return await asyncio.wait_for(coro, timeout=timeout)
     except asyncio.TimeoutError:
-        print(f"[Scheduler] Timeout after {timeout}s")
+        print(f"[Scheduler] {label} timeout after {timeout}s")
         return None
     except Exception as e:
-        print(f"[Scheduler] Error: {e}")
+        print(f"[Scheduler] {label} error: {e}")
         return None
 
 
-async def _update_steam_async():
-    games = await steam_scraper.fetch_top_games()
+async def update_steam():
+    print("[Scheduler] Updating Steam data...")
+    games = await _run_with_timeout(
+        steam_scraper.fetch_top_games(), timeout=60, label="Steam"
+    )
     if games:
         for game in games[:10]:
             await database.save_snapshot(
                 "steam", str(game["appid"]), game["name"], game["current_players"]
             )
-    return games
 
 
-async def _update_twitch_async():
-    games = await twitch_scraper.fetch_top_games()
+async def update_twitch():
+    print("[Scheduler] Updating Twitch data...")
+    games = await _run_with_timeout(
+        twitch_scraper.fetch_top_games(), timeout=45, label="Twitch"
+    )
     if games:
         for game in games[:10]:
             if game.get("viewer_count", 0) > 0:
                 await database.save_snapshot(
                     "twitch", str(game["id"]), game["name"], game["viewer_count"]
                 )
-    return games
 
 
-def update_steam():
-    print("[Scheduler] Updating Steam data...")
-    _run_async(_update_steam_async(), timeout=60)
-
-
-def update_twitch():
-    print("[Scheduler] Updating Twitch data...")
-    _run_async(_update_twitch_async(), timeout=45)
-
-
-def update_discussions():
+async def update_discussions():
     print("[Scheduler] Updating discussions...")
-    _run_async(discussion_scraper.fetch_all_discussions(), timeout=90)
+    await _run_with_timeout(
+        discussion_scraper.fetch_all_discussions(), timeout=90, label="Discussions"
+    )
 
 
-def update_news():
+async def update_news():
     print("[Scheduler] Updating news...")
-    _run_async(news_scraper.aggregate_news(), timeout=60)
+    await _run_with_timeout(
+        news_scraper.aggregate_news(), timeout=60, label="News"
+    )
 
 
-def update_mobile():
+async def update_mobile():
     print("[Scheduler] Updating mobile rankings...")
-    _run_async(mobile_scraper.fetch_all_mobile(), timeout=120)
+    await _run_with_timeout(
+        mobile_scraper.fetch_all_mobile(), timeout=120, label="Mobile"
+    )
 
 
-def update_weekly_digest():
+async def update_weekly_digest():
     print("[Scheduler] Updating weekly digest...")
-    _run_async(weekly_digest_scraper.fetch_weekly_digest())
+    await _run_with_timeout(
+        weekly_digest_scraper.fetch_weekly_digest(), timeout=300, label="WeeklyDigest"
+    )
 
 
-def _init_weekly_digest():
+async def cleanup_db():
+    print("[Scheduler] Cleaning up old DB snapshots...")
+    await _run_with_timeout(
+        database.cleanup_old_data(), timeout=60, label="DB Cleanup"
+    )
+
+
+async def _init_weekly_digest():
     """啟動時先確保依賴快取存在，再跑 weekly digest"""
     import os
     cache_dir = os.path.join(os.path.dirname(__file__), "cache")
     mobile_cache = os.path.join(cache_dir, "mobile_data.json")
     disc_cache = os.path.join(cache_dir, "discussion_data.json")
 
-    # 先確保 mobile + discussion 快取存在
     if not os.path.exists(mobile_cache):
         print("[Scheduler] Init: fetching mobile data first...")
-        update_mobile()
+        await update_mobile()
     if not os.path.exists(disc_cache):
         print("[Scheduler] Init: fetching discussion data first...")
-        update_discussions()
+        await update_discussions()
 
     print("[Scheduler] Init: now fetching weekly digest...")
-    update_weekly_digest()
+    await update_weekly_digest()
 
 
 def start_scheduler():
@@ -114,10 +124,12 @@ def start_scheduler():
                       next_run_time=now + timedelta(minutes=10), replace_existing=True)
     scheduler.add_job(update_weekly_digest, "cron", day_of_week="mon", hour=6, minute=0,
                       id="weekly_digest", replace_existing=True)
+    scheduler.add_job(cleanup_db, "cron", hour=3, minute=0,
+                      id="db_cleanup", replace_existing=True)
 
     scheduler.start()
 
-    # 首次啟動：若 weekly digest 快取不存在或為空，排程初始化（延後到其他 job 之後）
+    # 首次啟動：若 weekly digest 快取不存在或為空，排程初始化
     import os, json
     cache_file = os.path.join(os.path.dirname(__file__), "cache", "weekly_digest.json")
     need_init = not os.path.exists(cache_file)
@@ -134,7 +146,7 @@ def start_scheduler():
                           next_run_time=now + timedelta(minutes=15), replace_existing=True)
         print("[Scheduler] Weekly digest init queued (will run after 15min)")
 
-    print("[Scheduler] Started - Steam:10s, Twitch:2min, News:4min, Discussions:6min, Mobile:10min")
+    print("[Scheduler] Started (AsyncIO) - Steam:10s, Twitch:2min, News:4min, Discussions:6min, Mobile:10min")
 
 
 def stop_scheduler():

@@ -43,7 +43,9 @@ async def fetch_gnn_rss():
             pub_iso = ""
             if pub_raw:
                 try:
-                    pub_iso = parsedate_to_datetime(pub_raw).strftime("%Y-%m-%dT%H:%M:%S")
+                    from datetime import timezone
+                    dt = parsedate_to_datetime(pub_raw)
+                    pub_iso = dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                 except Exception:
                     pub_iso = pub_raw
             news.append({
@@ -79,7 +81,7 @@ async def fetch_4gamers_tw():
             published_at = ""
             ts = item.get("createPublishedAt")
             if ts:
-                published_at = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(ts / 1000))
+                published_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts / 1000))
             news.append({
                 "id": _news_hash(title, "4Gamers TW"),
                 "title": title,
@@ -113,7 +115,9 @@ async def fetch_udn_game():
             pub_iso = ""
             if pub_raw:
                 try:
-                    pub_iso = parsedate_to_datetime(pub_raw).strftime("%Y-%m-%dT%H:%M:%S")
+                    from datetime import timezone
+                    dt = parsedate_to_datetime(pub_raw)
+                    pub_iso = dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                 except Exception:
                     pub_iso = pub_raw
             news.append({

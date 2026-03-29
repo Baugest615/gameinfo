@@ -367,4 +367,6 @@ def _load_cache():
             "bahamut_boards": [], "ptt_boards": [],
             "bahamut_articles": [], "ptt_articles": [],
             "total_count": 0,
+            "sentiment_summary": {"label": "neutral", "positive": 0, "negative": 0, "neutral": 0},
+            "updated_at": 0,
         }

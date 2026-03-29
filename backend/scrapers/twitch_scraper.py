@@ -19,14 +19,22 @@ def _get_client_secret():
     return os.getenv("TWITCH_CLIENT_SECRET", "")
 
 _token_cache = {"access_token": None, "expires_at": 0}
-_token_lock = asyncio.Lock()
+_token_lock = None
+
+
+def _get_token_lock():
+    """延遲初始化 asyncio.Lock，確保綁定到正確的事件循環"""
+    global _token_lock
+    if _token_lock is None:
+        _token_lock = asyncio.Lock()
+    return _token_lock
 
 
 async def _get_access_token():
     """使用 Client Credentials Flow 取得 Twitch OAuth Token（async lock 防止並發重複刷新）"""
     global _token_cache
 
-    async with _token_lock:
+    async with _get_token_lock():
         if _token_cache["access_token"] and time.time() < _token_cache["expires_at"]:
             return _token_cache["access_token"]
 

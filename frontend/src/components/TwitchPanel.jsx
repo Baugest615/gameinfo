@@ -9,12 +9,16 @@ export default function TwitchPanel({ onTrendClick }) {
     const fetchData = async () => {
         try {
             const resp = await fetch(`${API_BASE}/api/twitch/top-games`)
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
             const json = await resp.json()
             setGames(json.data || [])
             setError(null)
         } catch (err) {
             console.error('[Twitch] Fetch error:', err)
-            if (games.length === 0) setError('Twitch 資料載入失敗')
+            setGames(prev => {
+                if (prev.length === 0) setError('Twitch 資料載入失敗')
+                return prev
+            })
         } finally {
             setLoading(false)
         }

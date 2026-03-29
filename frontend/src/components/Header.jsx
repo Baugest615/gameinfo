@@ -32,14 +32,20 @@ export default function Header({ steamData }) {
 
       <div className="header__ticker">
         <div className="ticker-track" ref={trackRef}>
-          {[...tickerItems, ...tickerItems].map((item, i) => (
-            <div key={i} className="ticker-item">
-              <span className="ticker-item__name">{item.name}</span>
-              <span className="ticker-item__value ticker-item__value--up">
-                ▲ {item.value}
-              </span>
+          {tickerItems.length === 0 ? (
+            <div className="ticker-item">
+              <span className="ticker-item__name">載入中...</span>
             </div>
-          ))}
+          ) : (
+            [...tickerItems, ...tickerItems].map((item, i) => (
+              <div key={i} className="ticker-item">
+                <span className="ticker-item__name">{item.name}</span>
+                <span className="ticker-item__value">
+                  {item.value}
+                </span>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

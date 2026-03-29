@@ -6,6 +6,7 @@
 - 時間範圍：過去 14 天（涵蓋進行中活動）
 - 排程：每周一執行一次
 """
+import asyncio
 import httpx
 from bs4 import BeautifulSoup
 from collections import Counter
@@ -770,20 +771,18 @@ async def fetch_weekly_digest() -> dict:
             bsn = game.get("bsn")
             _log(f"[WeeklyDigest] Searching: {name} (bsn={bsn})")
 
-            # 來源 1: Google News RSS（最廣覆蓋）
-            gnews_items = await _search_google_news(client, name, start_time)
-
-            # 來源 2: Facebook/IG 官方社群（Bing 搜尋公開貼文）
-            fb_items = await _search_social_posts(client, name, start_time)
-
-            # 來源 3: 4Gamers tag 搜尋
-            fgamers_items = await _search_4gamers(client, name, start_time)
-
-            # 來源 4: YouTube 官方影音
-            yt_items = await _search_youtube(client, name, start_time)
-
-            # 來源 5: 巴哈遊戲板活動公告
-            baha_items = await _search_bahamut_board(client, bsn, name)
+            # 5 個來源並行查詢
+            results = await asyncio.gather(
+                _search_google_news(client, name, start_time),
+                _search_social_posts(client, name, start_time),
+                _search_4gamers(client, name, start_time),
+                _search_youtube(client, name, start_time),
+                _search_bahamut_board(client, bsn, name),
+                return_exceptions=True,
+            )
+            gnews_items, fb_items, fgamers_items, yt_items, baha_items = [
+                r if isinstance(r, list) else [] for r in results
+            ]
 
             all_items = gnews_items + fb_items + fgamers_items + yt_items + baha_items
 

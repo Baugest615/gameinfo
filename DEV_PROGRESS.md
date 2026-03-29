@@ -1,5 +1,52 @@
 # GameInfo System 開發進度
 
+## 2026-03-30
+
+### 三家 AI 審查 + 全面修復 + 遷移至 Railway
+
+**起因**：用三個 AI 審查員（Backend / Frontend / Infra）平行檢視整個 codebase，共發現 25 個獨立問題。
+
+**Backend 修復（7 項）**：
+- Scheduler 從 `BackgroundScheduler` 改為 `AsyncIOScheduler`，共用 FastAPI 事件循環（解決記憶體壓力 + event loop 衝突）
+- Twitch `_token_lock` 延遲初始化，避免跨 event loop 失效
+- DB `save_snapshot` 與 `cleanup_old_data` 分離，清理改為每日凌晨 3 點排程
+- 新增 `recorded_at` 索引，加速清理查詢
+- Discussion 快取 fallback 補齊 `sentiment_summary` / `updated_at`
+- Weekly digest 5 來源改為 `asyncio.gather` 並行（避免 timeout）
+- 新聞時區統一為 UTC ISO 8601
+
+**Frontend 修復（9 項）**：
+- 所有面板 stale closure 修復（改用 functional state update）
+- 所有 fetch 加 `resp.ok` 檢查
+- SteamPanel 改用 App 傳入的共享資料，消除重複 API 請求
+- Ticker 移除硬編碼上漲箭頭 + 加空資料提示
+- TrendModal tooltip null guard
+- MobilePanel rank nullish guard
+- CSS `--border-subtle` → `--border-color`
+- 移除重複 CSS import
+- TrendModal onClose 用 `useCallback`
+
+**Infra 修復 + 遷移（4 項）**：
+- 根 Dockerfile Python 3.11 → 3.13
+- `.env.example` 補上 `YOUTUBE_API_KEY`
+- CORS `allow_headers` 改為 `["*"]`
+- **遷移至 Railway Singapore**（asia-southeast1），前端 API_BASE 已更新
+
+**部署狀態**：
+- Backend: Railway Singapore `gameinfo-backend-production.up.railway.app`
+- Frontend: Vercel（push 後自動部署）
+- 已驗證：Steam / Twitch / 巴哈 / PTT 文章 / 新聞 / 手遊排行全部正常
+
+**已知限制**：
+- PTT hotboards 從 Singapore 偶爾被擋（個別版面文章正常）
+- iOS Grossing = 0（Apple 不開放台灣區暢銷榜 RSS）
+
+### 待辦
+- 觀察 Railway 穩定性與費用
+- 考慮是否關閉 Fly.io 舊部署
+
+---
+
 ## 2026-02-26
 
 ### 爬蟲優化：排程錯開 + 並行化 + Timeout 保護

@@ -1,30 +1,23 @@
 import { useState, useEffect } from 'react'
-import { API_BASE } from '../config'
 
-export default function SteamPanel({ onTrendClick }) {
-    const [games, setGames] = useState([])
+export default function SteamPanel({ steamData, onTrendClick }) {
+    const games = steamData || []
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
 
-    const fetchData = async () => {
-        try {
-            const resp = await fetch(`${API_BASE}/api/steam/top-games`)
-            const json = await resp.json()
-            setGames(json.data || [])
-            setError(null)
-        } catch (err) {
-            console.error('[Steam] Fetch error:', err)
-            if (games.length === 0) setError('Steam 資料載入失敗')
-        } finally {
-            setLoading(false)
-        }
-    }
-
     useEffect(() => {
-        fetchData()
-        const timer = setInterval(fetchData, 10 * 60 * 1000)
-        return () => clearInterval(timer)
-    }, [])
+        if (games.length > 0) {
+            setLoading(false)
+            setError(null)
+        } else {
+            // 給初始載入一些時間
+            const timer = setTimeout(() => {
+                setLoading(false)
+                if (games.length === 0) setError('Steam 資料載入失敗')
+            }, 15000)
+            return () => clearTimeout(timer)
+        }
+    }, [games])
 
     if (loading) {
         return (

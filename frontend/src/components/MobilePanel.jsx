@@ -16,8 +16,14 @@ export default function MobilePanel() {
 
     useEffect(() => {
         Promise.all([
-            fetch(`${API_BASE}/api/mobile/ios`).then(r => r.json()),
-            fetch(`${API_BASE}/api/mobile/android`).then(r => r.json()),
+            fetch(`${API_BASE}/api/mobile/ios`).then(r => {
+                if (!r.ok) throw new Error(`iOS HTTP ${r.status}`);
+                return r.json();
+            }),
+            fetch(`${API_BASE}/api/mobile/android`).then(r => {
+                if (!r.ok) throw new Error(`Android HTTP ${r.status}`);
+                return r.json();
+            }),
         ])
             .then(([ios, android]) => {
                 setIosData(ios.data);
@@ -87,8 +93,8 @@ export default function MobilePanel() {
                             target="_blank"
                             rel="noopener noreferrer"
                         >
-                            <span className={`list-item__rank ${app.rank <= 3 ? 'list-item__rank--top3' : ''}`}>
-                                {app.rank}
+                            <span className={`list-item__rank ${(app.rank ?? i + 1) <= 3 ? 'list-item__rank--top3' : ''}`}>
+                                {app.rank ?? i + 1}
                             </span>
                             {app.icon && (
                                 <img

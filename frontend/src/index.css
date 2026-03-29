@@ -454,7 +454,7 @@ body {
 
 /* ── Weekly Digest ── */
 .digest-game {
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-color);
 }
 .digest-game:last-child {
   border-bottom: none;

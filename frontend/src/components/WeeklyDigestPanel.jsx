@@ -26,12 +26,16 @@ export default function WeeklyDigestPanel() {
         const fetchData = async () => {
             try {
                 const resp = await fetch(`${API_BASE}/api/weekly-digest`)
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
                 const json = await resp.json()
                 setData(json.data || null)
                 setError(null)
             } catch (err) {
                 console.error('[WeeklyDigest] Fetch error:', err)
-                if (!data) setError('摘要載入失敗')
+                setData(prev => {
+                    if (!prev) setError('摘要載入失敗')
+                    return prev
+                })
             } finally {
                 setLoading(false)
             }

@@ -19,6 +19,7 @@ export default function NewsPanel() {
     const fetchData = async () => {
         try {
             const resp = await fetch(`${API_BASE}/api/news`)
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
             const json = await resp.json()
             setNews(json.data?.news || [])
             setTotalCount(json.data?.total_count || 0)
@@ -26,7 +27,10 @@ export default function NewsPanel() {
             setError(null)
         } catch (err) {
             console.error('[News] Fetch error:', err)
-            if (news.length === 0) setError('新聞載入失敗')
+            setNews(prev => {
+                if (prev.length === 0) setError('新聞載入失敗')
+                return prev
+            })
         } finally {
             setLoading(false)
         }

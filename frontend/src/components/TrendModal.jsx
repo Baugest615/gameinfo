@@ -149,6 +149,7 @@ export default function TrendModal({ target, onClose }) {
                   contentStyle={{ background: '#151d2e', border: '1px solid #1e293b', borderRadius: 6 }}
                   labelStyle={{ color: '#94a3b8', fontSize: 12 }}
                   formatter={(v, name) => {
+                    if (v == null) return ['—', name === 'forecast' ? `預測${valueLabel}` : valueLabel]
                     if (name === 'forecast') return [v.toLocaleString(), `預測${valueLabel}`]
                     return [v.toLocaleString(), valueLabel]
                   }}
