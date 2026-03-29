@@ -143,8 +143,8 @@ def start_scheduler():
             need_init = True
     if need_init:
         scheduler.add_job(_init_weekly_digest, id="weekly_digest_init",
-                          next_run_time=now + timedelta(minutes=15), replace_existing=True)
-        print("[Scheduler] Weekly digest init queued (will run after 15min)")
+                          next_run_time=now + timedelta(minutes=12), replace_existing=True)
+        print("[Scheduler] Weekly digest init queued (will run after 12min)")
 
     print("[Scheduler] Started (AsyncIO) - Steam:10s, Twitch:2min, News:4min, Discussions:6min, Mobile:10min")
 

@@ -34,8 +34,14 @@
 
 **部署狀態**：
 - Backend: Railway Singapore `gameinfo-backend-production.up.railway.app`
-- Frontend: Vercel（push 後自動部署）
-- 已驗證：Steam / Twitch / 巴哈 / PTT 文章 / 新聞 / 手遊排行全部正常
+- Frontend: Vercel `gameinfo-drab.vercel.app`（需手動 `vercel deploy --prod` 或 Dashboard 觸發，Vercel 環境變數 `VITE_API_BASE` 已更新指向 Railway）
+- Volume: `/app/cache`（Railway persistent volume，SQLite + JSON 快取持久化）
+- 環境變數: `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` / `YOUTUBE_API_KEY` / `FRONTEND_URL` 已設定
+- 已驗證：Steam / Twitch / 巴哈 / PTT 文章 / 新聞 / 手遊排行 / 每周摘要 全部正常
+
+**部署注意事項**：
+- Vercel 的 `VITE_API_BASE` 環境變數會覆蓋 `.env.production`，修改 API URL 需同步更新 Vercel Dashboard
+- Weekly digest init 排程 12 分鐘後執行，若短時間內多次部署可能需手動 `POST /api/weekly-digest/refresh`
 
 **已知限制**：
 - PTT hotboards 從 Singapore 偶爾被擋（個別版面文章正常）
