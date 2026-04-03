@@ -7,8 +7,10 @@ import os
 import traceback
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from dotenv import load_dotenv
 
 # 載入環境變數
@@ -64,7 +66,10 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """捕捉所有未處理的異常，回傳安全的錯誤訊息，詳細資訊只寫 log"""
+    """捕捉所有未處理的異常，回傳安全的錯誤訊息，詳細資訊只寫 log。
+    HTTPException 和 RequestValidationError 交回 FastAPI 預設處理。"""
+    if isinstance(exc, (StarletteHTTPException, RequestValidationError)):
+        raise exc
     logger.error(
         "Unhandled exception on %s %s: %s",
         request.method, request.url.path,
