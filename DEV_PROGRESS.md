@@ -1,5 +1,20 @@
 # GameInfo System 開發進度
 
+## 2026-04-04
+
+### 測試基礎建設 — DB snapshot + Scheduler resilience 測試套件（進行中）
+
+**動機**：專案零測試覆蓋。`database.py` 的 `save_snapshot` + `cleanup_old_data` 是歷史趨勢資料的命脈，`scheduler.py` 的 timeout 機制未經驗證。Railway 部署後如果 DB 或排程壞了完全無預警。
+
+**方案**：
+- 建立 pytest + pytest-asyncio 測試框架
+- 第一批測試：DB snapshot 完整性（存取 / 清理 / 邊界條件）+ Scheduler timeout 行為（正常 / 超時 / cascade failure 防護）
+- 使用 in-memory SQLite 隔離測試，不碰實際 DB
+
+**預估範圍**：10-15 個測試，覆蓋 `database.py` 和 `scheduler.py` 核心路徑
+
+---
+
 ## 2026-04-03
 
 ### source 參數 enum 驗證 + 手動刷新端點認證（完成）
