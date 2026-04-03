@@ -1,0 +1,15 @@
+{
+  "review_id": "CR-20260403134641",
+  "target_mode": "diff",
+  "mode": "parallel-union",
+  "reviewer_a_cli": "gemini",
+  "reviewer_b_cli": "codex",
+  "synthesizer_cli": "claude-code",
+  "parallel_mode": true,
+  "available_models": 3,
+  "duration_seconds": 1129,
+  "parallel_review_seconds": 1129,
+  "synthesizer_seconds": 0,
+  "code_size_bytes": 23601,
+  "timestamp": "2026-04-03T06:05:30Z"
+}

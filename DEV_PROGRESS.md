@@ -2,21 +2,21 @@
 
 ## 2026-04-03
 
-### 後端 API 錯誤處理 + 前端 Error Boundary（待 review）
+### source 參數 enum 驗證 + 手動刷新端點認證（完成）
 
-**動機**：自主發現 — API 端點無 try/except、無 global exception handler、前端無 Error Boundary。
+**動機**：夜班自主掃描發現兩個安全/健壯性問題：
+1. `/api/history/{source}/{game_id}` 的 `source` 是 `str`，無效值不回 422 而是靜默回空資料，前端無法區分「無資料」和「打錯參數」
+2. `/api/weekly-digest/refresh` 是 POST 但無任何認證，任何人可觸發昂貴的外部 API 呼叫（Google News/YouTube/4Gamers/巴哈）
 
-**Branch**：`night-shift/2026-04-03/backend-error-handling-frontend-error-boundary`
+**方案**：
+1. 定義 `SourceEnum(str, Enum)` 用於 path parameter，FastAPI 自動回 422 + 錯誤訊息
+2. refresh 端點加 header-based auth（`X-Refresh-Token` 比對環境變數 `REFRESH_SECRET`）
 
-**改動摘要**：
-- 後端：global exception handler + 所有端點 try/except + 結構化錯誤回應（503/400）
-- 前端：ErrorBoundary.jsx（panel 級隔離 + key-based reset）
-- 前端：所有 fetch 加 AbortController
-- 影響 9 個檔案（+310/-91 行）
+**改動檔案**：
+- `backend/main.py` — SourceEnum 定義 + history 端點型別改 + refresh 端點 auth
+- `backend/.env.example` — 新增 REFRESH_SECRET 欄位
 
-**驗證**：frontend build ✅ / backend syntax ✅ / deliberation 完成
-
-**建議**：直接 merge，低風險。如需進一步可做：(1) scraper 回傳契約改善 (2) 共用 useFetch hook
+**部署注意**：需在 Railway 設定 `REFRESH_SECRET` 環境變數，否則 refresh 端點會拒絕所有請求
 
 ---
 

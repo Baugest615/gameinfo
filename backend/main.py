@@ -5,8 +5,9 @@ GameInfo System — FastAPI 主入口
 import logging
 import os
 import traceback
+from enum import Enum
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,6 +16,14 @@ from dotenv import load_dotenv
 
 # 載入環境變數
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+
+
+class SourceEnum(str, Enum):
+    """歷史趨勢資料來源"""
+    steam = "steam"
+    twitch = "twitch"
+
 
 from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper, weekly_digest_scraper
 from scheduler import start_scheduler, stop_scheduler
@@ -211,25 +220,20 @@ async def get_mobile_all():
 
 @app.get("/api/history/{source}/{game_id}", tags=["歷史趨勢"])
 async def get_history(
-    source: str,
+    source: SourceEnum,
     game_id: str,
     days: int = Query(default=7, ge=1, le=30),
     forecast: bool = Query(default=False),
 ):
     """取得遊戲歷史數據（source: steam | twitch，days: 1-30，forecast: 是否包含預測）"""
-    if source not in ("steam", "twitch"):
-        return JSONResponse(
-            status_code=400,
-            content={"error": "invalid_source", "message": f"不支援的資料來源: {source}，請使用 steam 或 twitch"},
-        )
     try:
-        data = await database.get_history(source, game_id, days)
+        data = await database.get_history(source.value, game_id, days)
         forecast_data = []
         if forecast and len(data) >= 6:
             forecast_data = predictor.predict(data)
-        return {"data": data, "forecast": forecast_data, "game_id": game_id, "source": source}
+        return {"data": data, "forecast": forecast_data, "game_id": game_id, "source": source.value}
     except Exception as e:
-        logger.error("[History] %s/%s endpoint failed: %s", source, game_id, e)
+        logger.error("[History] %s/%s endpoint failed: %s", source.value, game_id, e)
         return JSONResponse(
             status_code=503,
             content={"error": "database_error", "message": "歷史資料暫時無法取得"},
@@ -255,9 +259,14 @@ async def get_weekly_digest():
         )
 
 
+_REFRESH_SECRET = os.getenv("REFRESH_SECRET", "")
+
+
 @app.post("/api/weekly-digest/refresh", tags=["每周摘要"])
-async def refresh_weekly_digest():
-    """手動觸發重新生成每周行銷摘要"""
+async def refresh_weekly_digest(x_refresh_token: str = Header()):
+    """手動觸發重新生成每周行銷摘要（需 X-Refresh-Token header 認證）"""
+    if not _REFRESH_SECRET or x_refresh_token != _REFRESH_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid or missing refresh token")
     try:
         data = await weekly_digest_scraper.fetch_weekly_digest()
         return {"data": data, "source": "Google News/4Gamers/YouTube/巴哈板"}

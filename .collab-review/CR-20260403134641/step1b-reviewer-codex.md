@@ -1,0 +1,1 @@
+{"issues":[],"summary":"No confirmed runtime or production-impacting bugs found in the provided diff; the main residual risk is unreviewed context outside this patch (for example the new ErrorBoundary component and any consumers that depend on previous 200 responses from failing backend endpoints)."}
