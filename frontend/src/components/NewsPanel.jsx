@@ -16,30 +16,34 @@ export default function NewsPanel() {
     const [sourceCounts, setSourceCounts] = useState({})
     const [activeTab, setActiveTab] = useState('all')
 
-    const fetchData = async () => {
-        try {
-            const resp = await fetch(`${API_BASE}/api/news`)
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-            const json = await resp.json()
-            setNews(json.data?.news || [])
-            setTotalCount(json.data?.total_count || 0)
-            setSourceCounts(json.data?.source_counts || {})
-            setError(null)
-        } catch (err) {
-            console.error('[News] Fetch error:', err)
-            setNews(prev => {
-                if (prev.length === 0) setError('新聞載入失敗')
-                return prev
-            })
-        } finally {
-            setLoading(false)
-        }
-    }
-
     useEffect(() => {
+        const controller = new AbortController()
+        const fetchData = async () => {
+            try {
+                const resp = await fetch(`${API_BASE}/api/news`, { signal: controller.signal })
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+                const json = await resp.json()
+                setNews(json.data?.news || [])
+                setTotalCount(json.data?.total_count || 0)
+                setSourceCounts(json.data?.source_counts || {})
+                setError(null)
+            } catch (err) {
+                if (err.name === 'AbortError') return
+                console.error('[News] Fetch error:', err)
+                setNews(prev => {
+                    if (prev.length === 0) setError('新聞載入失敗')
+                    return prev
+                })
+            } finally {
+                if (!controller.signal.aborted) setLoading(false)
+            }
+        }
         fetchData()
         const timer = setInterval(fetchData, 10 * 60 * 1000)
-        return () => clearInterval(timer)
+        return () => {
+            controller.abort()
+            clearInterval(timer)
+        }
     }, [])
 
     const activeSource = TABS.find(t => t.key === activeTab)?.source

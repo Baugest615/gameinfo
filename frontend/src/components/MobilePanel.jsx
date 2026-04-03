@@ -15,12 +15,13 @@ export default function MobilePanel() {
     const [activeTab, setActiveTab] = useState('ios_free');
 
     useEffect(() => {
+        const controller = new AbortController();
         Promise.all([
-            fetch(`${API_BASE}/api/mobile/ios`).then(r => {
+            fetch(`${API_BASE}/api/mobile/ios`, { signal: controller.signal }).then(r => {
                 if (!r.ok) throw new Error(`iOS HTTP ${r.status}`);
                 return r.json();
             }),
-            fetch(`${API_BASE}/api/mobile/android`).then(r => {
+            fetch(`${API_BASE}/api/mobile/android`, { signal: controller.signal }).then(r => {
                 if (!r.ok) throw new Error(`Android HTTP ${r.status}`);
                 return r.json();
             }),
@@ -31,10 +32,12 @@ export default function MobilePanel() {
                 setError(null);
                 setLoading(false);
             })
-            .catch(() => {
+            .catch(err => {
+                if (err.name === 'AbortError') return;
                 setError('手遊排行載入失敗');
                 setLoading(false);
             });
+        return () => controller.abort();
     }, []);
 
     const getItems = () => {

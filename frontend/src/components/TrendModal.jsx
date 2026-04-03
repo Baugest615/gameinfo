@@ -40,20 +40,28 @@ export default function TrendModal({ target, onClose }) {
 
   useEffect(() => {
     if (!target) return
+    const controller = new AbortController()
     setLoading(true)
     setError(null)
-    fetch(`${API_BASE}/api/history/${target.source}/${target.id}?days=${days}&forecast=true`)
-      .then((r) => r.json())
+    fetch(`${API_BASE}/api/history/${target.source}/${target.id}?days=${days}&forecast=true`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then((json) => {
         setData(json.data || [])
         setForecast(json.forecast || [])
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err.name === 'AbortError') return
         setData([])
         setForecast([])
         setError('趨勢資料載入失敗')
       })
-      .finally(() => setLoading(false))
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false)
+      })
+    return () => controller.abort()
   }, [target, days])
 
   if (!target) return null
