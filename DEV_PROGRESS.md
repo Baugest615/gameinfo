@@ -1,5 +1,19 @@
 # GameInfo System 開發進度
 
+## 2026-04-03
+
+### source 參數 enum 驗證 + 手動刷新端點認證（進行中）
+
+**動機**：夜班自主掃描發現兩個安全/健壯性問題：
+1. `/api/history/{source}/{game_id}` 的 `source` 是 `str`，無效值不回 422 而是靜默回空資料，前端無法區分「無資料」和「打錯參數」
+2. `/api/weekly-digest/refresh` 是 POST 但無任何認證，任何人可觸發昂貴的外部 API 呼叫（Google News/YouTube/4Gamers/巴哈）
+
+**方案**：
+1. 定義 `SourceEnum(str, Enum)` 用於 path parameter，FastAPI 自動回 422 + 錯誤訊息
+2. refresh 端點加 header-based auth（`X-Refresh-Token` 比對環境變數 `REFRESH_SECRET`）
+
+---
+
 ## 2026-03-30
 
 ### 三家 AI 審查 + 全面修復 + 遷移至 Railway
