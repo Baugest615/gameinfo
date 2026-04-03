@@ -1,5 +1,9 @@
 # GameInfo System 開發進度
 
+## Night Shift 2026-04-04
+- Auto: add .collab-review/ to .gitignore（已 merge）
+- Develop (待 review): `night-shift/2026-04-04/scraper-tests` — 23 個新 Scraper 單元測試（Steam/Twitch/Discussion/News）
+
 ## Night Shift 2026-04-03（最終彙整）
 - **Develop (已 merge)**：後端 API 錯誤處理 + 前端 Error Boundary, source enum 驗證 + 手動刷新端點 auth
 - **Develop (待 review)**：
