@@ -6,28 +6,32 @@ export default function TwitchPanel({ onTrendClick }) {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
 
-    const fetchData = async () => {
-        try {
-            const resp = await fetch(`${API_BASE}/api/twitch/top-games`)
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-            const json = await resp.json()
-            setGames(json.data || [])
-            setError(null)
-        } catch (err) {
-            console.error('[Twitch] Fetch error:', err)
-            setGames(prev => {
-                if (prev.length === 0) setError('Twitch 資料載入失敗')
-                return prev
-            })
-        } finally {
-            setLoading(false)
-        }
-    }
-
     useEffect(() => {
+        const controller = new AbortController()
+        const fetchData = async () => {
+            try {
+                const resp = await fetch(`${API_BASE}/api/twitch/top-games`, { signal: controller.signal })
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+                const json = await resp.json()
+                setGames(json.data || [])
+                setError(null)
+            } catch (err) {
+                if (err.name === 'AbortError') return
+                console.error('[Twitch] Fetch error:', err)
+                setGames(prev => {
+                    if (prev.length === 0) setError('Twitch 資料載入失敗')
+                    return prev
+                })
+            } finally {
+                if (!controller.signal.aborted) setLoading(false)
+            }
+        }
         fetchData()
         const timer = setInterval(fetchData, 10 * 60 * 1000)
-        return () => clearInterval(timer)
+        return () => {
+            controller.abort()
+            clearInterval(timer)
+        }
     }, [])
 
     if (loading) {

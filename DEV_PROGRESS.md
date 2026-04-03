@@ -1,7 +1,24 @@
 # GameInfo System 開發進度
 
-## Night Shift 2026-04-03
-- Develop (待 review): backend-error-handling + frontend ErrorBoundary (10 files, +335/-91), source-enum-validation + refresh-auth
+## 2026-04-03
+
+### 後端 API 錯誤處理 + 前端 Error Boundary（待 review）
+
+**動機**：自主發現 — API 端點無 try/except、無 global exception handler、前端無 Error Boundary。
+
+**Branch**：`night-shift/2026-04-03/backend-error-handling-frontend-error-boundary`
+
+**改動摘要**：
+- 後端：global exception handler + 所有端點 try/except + 結構化錯誤回應（503/400）
+- 前端：ErrorBoundary.jsx（panel 級隔離 + key-based reset）
+- 前端：所有 fetch 加 AbortController
+- 影響 9 個檔案（+310/-91 行）
+
+**驗證**：frontend build ✅ / backend syntax ✅ / deliberation 完成
+
+**建議**：直接 merge，低風險。如需進一步可做：(1) scraper 回傳契約改善 (2) 共用 useFetch hook
+
+---
 
 ## 2026-03-30
 

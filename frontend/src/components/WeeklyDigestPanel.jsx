@@ -23,27 +23,31 @@ export default function WeeklyDigestPanel() {
     const [expandedGame, setExpandedGame] = useState(null)
 
     useEffect(() => {
+        const controller = new AbortController()
         const fetchData = async () => {
             try {
-                const resp = await fetch(`${API_BASE}/api/weekly-digest`)
+                const resp = await fetch(`${API_BASE}/api/weekly-digest`, { signal: controller.signal })
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
                 const json = await resp.json()
                 setData(json.data || null)
                 setError(null)
             } catch (err) {
+                if (err.name === 'AbortError') return
                 console.error('[WeeklyDigest] Fetch error:', err)
                 setData(prev => {
                     if (!prev) setError('摘要載入失敗')
                     return prev
                 })
             } finally {
-                setLoading(false)
+                if (!controller.signal.aborted) setLoading(false)
             }
         }
         fetchData()
-        // 每周摘要不需要頻繁刷新，30 分鐘一次即可
         const timer = setInterval(fetchData, 30 * 60 * 1000)
-        return () => clearInterval(timer)
+        return () => {
+            controller.abort()
+            clearInterval(timer)
+        }
     }, [])
 
     const digest = data?.digest || []

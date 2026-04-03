@@ -24,18 +24,24 @@ export default function DiscussionPanel() {
     };
 
     useEffect(() => {
-        fetch(`${API_BASE}/api/discussions`)
-            .then(r => r.json())
+        const controller = new AbortController();
+        fetch(`${API_BASE}/api/discussions`, { signal: controller.signal })
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            })
             .then(d => {
                 setData(d.data);
                 setSentimentSummary(d.data?.sentiment_summary || null);
                 setError(null);
                 setLoading(false);
             })
-            .catch(() => {
+            .catch(err => {
+                if (err.name === 'AbortError') return;
                 setError('討論數據載入失敗');
                 setLoading(false);
             });
+        return () => controller.abort();
     }, []);
 
     const currentItems = data ? (data[activeTab] || []) : [];
