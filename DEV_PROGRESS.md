@@ -2,7 +2,7 @@
 
 ## 2026-04-03
 
-### source 參數 enum 驗證 + 手動刷新端點認證（進行中）
+### source 參數 enum 驗證 + 手動刷新端點認證（完成）
 
 **動機**：夜班自主掃描發現兩個安全/健壯性問題：
 1. `/api/history/{source}/{game_id}` 的 `source` 是 `str`，無效值不回 422 而是靜默回空資料，前端無法區分「無資料」和「打錯參數」
@@ -11,6 +11,12 @@
 **方案**：
 1. 定義 `SourceEnum(str, Enum)` 用於 path parameter，FastAPI 自動回 422 + 錯誤訊息
 2. refresh 端點加 header-based auth（`X-Refresh-Token` 比對環境變數 `REFRESH_SECRET`）
+
+**改動檔案**：
+- `backend/main.py` — SourceEnum 定義 + history 端點型別改 + refresh 端點 auth
+- `backend/.env.example` — 新增 REFRESH_SECRET 欄位
+
+**部署注意**：需在 Railway 設定 `REFRESH_SECRET` 環境變數，否則 refresh 端點會拒絕所有請求
 
 ---
 
