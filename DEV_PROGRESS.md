@@ -2,16 +2,26 @@
 
 ## 2026-04-04
 
-### 測試基礎建設 — DB snapshot + Scheduler resilience 測試套件（進行中）
+### 測試基礎建設 — DB snapshot + Scheduler resilience 測試套件（完成，待 review）
 
 **動機**：專案零測試覆蓋。`database.py` 的 `save_snapshot` + `cleanup_old_data` 是歷史趨勢資料的命脈，`scheduler.py` 的 timeout 機制未經驗證。Railway 部署後如果 DB 或排程壞了完全無預警。
 
-**方案**：
-- 建立 pytest + pytest-asyncio 測試框架
-- 第一批測試：DB snapshot 完整性（存取 / 清理 / 邊界條件）+ Scheduler timeout 行為（正常 / 超時 / cascade failure 防護）
-- 使用 in-memory SQLite 隔離測試，不碰實際 DB
+**改動檔案**：
+- `backend/pytest.ini` — pytest 設定（asyncio_mode=auto）
+- `backend/tests/conftest.py` — 共用 fixture，tmp_path + monkeypatch 隔離 DB
+- `backend/tests/test_database.py` — 13 個測試覆蓋 init_db / save_snapshot / get_history / cleanup_old_data
+- `backend/tests/test_scheduler.py` — 10 個測試覆蓋 _run_with_timeout / update_steam / update_twitch / cascade failure
 
-**預估範圍**：10-15 個測試，覆蓋 `database.py` 和 `scheduler.py` 核心路徑
+**驗證結果**：23 tests passed（0.76s），使用 Python 3.12 + pytest-asyncio
+
+**新增依賴**（僅開發用）：pytest, pytest-asyncio（未加入 requirements.txt，建議另建 requirements-dev.txt）
+
+**Branch**: `night-shift/2026-04-03/測試基礎建設-DB-snapshot-Scheduler-resilience-測試套件`
+
+**建議 review 方式**：
+1. `cd backend && source .venv/bin/activate && python -m pytest -v` 確認全過
+2. 看 `tests/test_database.py` 的邊界條件是否符合預期（90天清理、30天上限）
+3. 看 `tests/test_scheduler.py` 的 mock 策略是否合理
 
 ---
 
