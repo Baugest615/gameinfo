@@ -94,10 +94,17 @@ async def test_update_steam_handles_timeout():
     await database.init_db()
 
     async def slow_fetch():
-        await asyncio.sleep(10)
+        await asyncio.sleep(100)
+        return []
 
-    with patch("scheduler.steam_scraper.fetch_top_games", side_effect=slow_fetch):
-        with patch.object(scheduler, "_run_with_timeout", new_callable=AsyncMock, return_value=None):
+    with patch("scheduler.steam_scraper.fetch_top_games", new=slow_fetch):
+        # 暫時把 timeout 設很短，讓真正的 _run_with_timeout 觸發超時
+        original = scheduler._run_with_timeout
+
+        async def short_timeout(coro, timeout, label):
+            return await original(coro, timeout=0.1, label=label)
+
+        with patch.object(scheduler, "_run_with_timeout", side_effect=short_timeout):
             await scheduler.update_steam()
 
     result = await database.get_history("steam", "730")
