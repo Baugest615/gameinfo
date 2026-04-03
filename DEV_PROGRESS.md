@@ -7,6 +7,16 @@
 
 ## 2026-04-04
 
+### Scraper 測試覆蓋 — Steam/Twitch/Discussion/News 核心邏輯單元測試（進行中）
+
+**動機**：生產環境 11 個 scraper 檔案零測試覆蓋。DB/Scheduler 已有 23 tests，但 scraper 解析邏輯（最容易因外部網站改版而壞）完全沒有保護。
+
+**方案**：為 4 個核心 scraper 各寫 4-5 個測試，使用 unittest.mock 模擬 httpx 回應。
+
+**Branch**: `night-shift/2026-04-04/scraper-tests`
+
+---
+
 ### 測試基礎建設 — DB snapshot + Scheduler resilience 測試套件（完成，待 review）
 
 **動機**：專案零測試覆蓋。`database.py` 的 `save_snapshot` + `cleanup_old_data` 是歷史趨勢資料的命脈，`scheduler.py` 的 timeout 機制未經驗證。Railway 部署後如果 DB 或排程壞了完全無預警。
