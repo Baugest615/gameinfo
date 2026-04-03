@@ -1,5 +1,15 @@
 # GameInfo System 開發進度
 
+## 2026-04-03
+
+### 後端 API 錯誤處理 + 前端 Error Boundary（夜班進行中）
+
+**動機**：自主發現 — API 端點無 try/except、無 global exception handler、前端無 Error Boundary。
+
+**狀態**：branch `night-shift/2026-04-03/backend-error-handling-frontend-error-boundary` 開發中
+
+---
+
 ## 2026-03-30
 
 ### 三家 AI 審查 + 全面修復 + 遷移至 Railway
