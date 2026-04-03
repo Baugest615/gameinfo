@@ -1,5 +1,8 @@
 # GameInfo System 開發進度
 
+## Night Shift 2026-04-03
+- Develop (待 review): backend-error-handling + frontend ErrorBoundary (10 files, +335/-91), source-enum-validation + refresh-auth
+
 ## 2026-03-30
 
 ### 三家 AI 審查 + 全面修復 + 遷移至 Railway
