@@ -3,8 +3,9 @@ GameInfo System — FastAPI 主入口
 遊戲市場即時輿情追蹤系統 API Server
 """
 import os
+from enum import Enum
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -12,6 +13,14 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 from fastapi import Query
+
+
+class SourceEnum(str, Enum):
+    """歷史趨勢資料來源"""
+    steam = "steam"
+    twitch = "twitch"
+
+
 from scrapers import steam_scraper, twitch_scraper, discussion_scraper, news_scraper, mobile_scraper, weekly_digest_scraper
 from scheduler import start_scheduler, stop_scheduler
 import database
@@ -125,19 +134,17 @@ async def get_mobile_all():
 
 @app.get("/api/history/{source}/{game_id}", tags=["歷史趨勢"])
 async def get_history(
-    source: str,
+    source: SourceEnum,
     game_id: str,
     days: int = Query(default=7, ge=1, le=30),
     forecast: bool = Query(default=False),
 ):
     """取得遊戲歷史數據（source: steam | twitch，days: 1-30，forecast: 是否包含預測）"""
-    if source not in ("steam", "twitch"):
-        return {"data": [], "forecast": [], "game_id": game_id, "source": source}
-    data = await database.get_history(source, game_id, days)
+    data = await database.get_history(source.value, game_id, days)
     forecast_data = []
     if forecast and len(data) >= 6:
         forecast_data = predictor.predict(data)
-    return {"data": data, "forecast": forecast_data, "game_id": game_id, "source": source}
+    return {"data": data, "forecast": forecast_data, "game_id": game_id, "source": source.value}
 
 
 
@@ -152,9 +159,14 @@ async def get_weekly_digest():
     return {"data": data, "source": "Google News/4Gamers/YouTube/巴哈板"}
 
 
+_REFRESH_SECRET = os.getenv("REFRESH_SECRET", "")
+
+
 @app.post("/api/weekly-digest/refresh", tags=["每周摘要"])
-async def refresh_weekly_digest():
-    """手動觸發重新生成每周行銷摘要"""
+async def refresh_weekly_digest(x_refresh_token: str = Header()):
+    """手動觸發重新生成每周行銷摘要（需 X-Refresh-Token header 認證）"""
+    if not _REFRESH_SECRET or x_refresh_token != _REFRESH_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid or missing refresh token")
     data = await weekly_digest_scraper.fetch_weekly_digest()
     return {"data": data, "source": "Google News/4Gamers/YouTube/巴哈板"}
 
