@@ -11,6 +11,29 @@
 
 ## 2026-04-04
 
+### Scraper 測試覆蓋 — Steam/Twitch/Discussion/News 核心邏輯單元測試（完成，待 review）
+
+**動機**：生產環境 11 個 scraper 檔案零測試覆蓋。DB/Scheduler 已有 23 tests，但 scraper 解析邏輯（最容易因外部網站改版而壞）完全沒有保護。
+
+**改動檔案**：
+- `backend/tests/test_steam_scraper.py` — 5 個測試：API 解析、空 ranks、cache fallback、player count 成功/失敗
+- `backend/tests/test_twitch_scraper.py` — 6 個測試：token 取得/快取/缺憑證、demo fallback、串流解析/容錯
+- `backend/tests/test_discussion_scraper.py` — 5 個測試：PTT hotboards HTML 解析、推文數轉換（爆/X/數字）、巴哈版面/文章解析
+- `backend/tests/test_news_scraper.py` — 7 個測試：hash 確定性、GNN RSS 解析/容錯、4Gamers JSON 解析、aggregate 去重/部分失敗
+
+**驗證結果**：46 tests passed（23 既有 + 23 新增），0.58s，零回歸
+
+**無新增依賴** — 全部使用 unittest.mock，不需裝額外套件
+
+**Branch**: `night-shift/2026-04-04/scraper-tests`
+
+**建議 review 方式**：
+1. `cd backend && source .venv/bin/activate && python -m pytest -v` 確認全過
+2. 重點看 `test_discussion_scraper.py` 的 PTT HTML mock 是否符合實際結構
+3. 看 mock 策略是否足夠覆蓋外部 API 改版風險
+
+---
+
 ### 測試基礎建設 — DB snapshot + Scheduler resilience 測試套件（完成，待 review）
 
 **動機**：專案零測試覆蓋。`database.py` 的 `save_snapshot` + `cleanup_old_data` 是歷史趨勢資料的命脈，`scheduler.py` 的 timeout 機制未經驗證。Railway 部署後如果 DB 或排程壞了完全無預警。
