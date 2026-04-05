@@ -1,5 +1,8 @@
 # GameInfo System 開發進度
 
+## Night Shift 2026-04-06
+- develop: `night-shift/2026-04-06/Scraper-測試覆蓋擴充-Mobile-YouTube-modules` — 41 新測試（mobile+YouTube），87 tests ✅
+
 ## Night Shift 2026-04-04
 - Auto: add .collab-review/ to .gitignore（已 merge）
 - Develop (待 review): `night-shift/2026-04-04/scraper-tests` — 23 個新 Scraper 單元測試（Steam/Twitch/Discussion/News）
