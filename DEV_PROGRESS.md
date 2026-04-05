@@ -1,5 +1,31 @@
 # GameInfo System 開發進度
 
+## Night Shift 2026-04-06
+- Develop (待 review): `night-shift/2026-04-06/Scraper-測試覆蓋擴充-Mobile-YouTube-modules` — 41 個新測試（Mobile 14 + WeeklyDigest/YouTube 27）
+
+### Scraper 測試覆蓋擴充 — Mobile + YouTube modules（完成，待 review）
+
+**動機**：專案已有 46 tests（DB/Scheduler/Steam/Twitch/Discussion/News），但 mobile_scraper 和 weekly_digest_scraper（含 YouTube API）零測試覆蓋。這兩個模組涉及外部 API 和 HTML 解析，是最容易因上游改版而壞的部分。
+
+**改動檔案**：
+- `backend/tests/test_mobile_scraper.py` — 14 個測試：iOS RSS 解析、Android gplay-scraper mock、cache fallback、fetch_all_mobile 聚合與部分失敗
+- `backend/tests/test_weekly_digest_scraper.py` — 27 個測試：分類邏輯、遊戲名匹配（含 TAG_ALIASES 別名 + CJK）、名稱清理、去重、YouTube API 解析/過濾/去重/容錯、cache
+
+**驗證結果**：87 tests passed（46 既有 + 41 新增），0.91s，零回歸
+
+**無新增依賴** — 全部使用 unittest.mock
+
+**Branch**: `night-shift/2026-04-06/Scraper-測試覆蓋擴充-Mobile-YouTube-modules`
+
+**建議 review 方式**：
+1. `cd backend && source .venv/bin/activate && python -m pytest -v` 確認全過
+2. 重點看 test_mobile_scraper.py 的 gplay-scraper mock 策略是否合理
+3. 看 test_weekly_digest_scraper.py 的 YouTube API mock 是否覆蓋了配額超限等邊界情境
+
+**備註**：原任務說明提到 `youtube_trending` 模組，但專案中沒有獨立的 YouTube trending 模組。YouTube 功能整合在 `weekly_digest_scraper.py` 的 `_search_youtube()` 函式中，測試已覆蓋該函式。
+
+---
+
 ## Night Shift 2026-04-04
 - Auto: add .collab-review/ to .gitignore（已 merge）
 - Develop (待 review): `night-shift/2026-04-04/scraper-tests` — 23 個新 Scraper 單元測試（Steam/Twitch/Discussion/News）
