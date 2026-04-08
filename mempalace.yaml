@@ -6,3 +6,10 @@ rooms:
   description: Files from frontend/
 - name: general
   description: Files that don't fit other rooms
+grade: medium
+ignore:
+  dirs: []
+  files: []
+mining:
+  auto: true
+  chunk_size: 800
