@@ -1,0 +1,8 @@
+wing: gameinfo_system
+rooms:
+- name: backend
+  description: Files from backend/
+- name: frontend
+  description: Files from frontend/
+- name: general
+  description: Files that don't fit other rooms
